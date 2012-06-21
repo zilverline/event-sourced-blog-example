@@ -1,0 +1,17 @@
+@(posts: Seq[Post])
+
+@main("Blog Posts") {
+
+    <table class="table table-striped">
+      <thead>
+        <tr><th>Title</th><th>Author</th></tr>
+      </thead>
+      <tbody>
+        @for(post <- posts.takeRight(20).reverse) {
+          <tr><td>@post.title</td><td>@post.author</td></tr>
+        }
+      </tbody>
+    </table>
+    
+    <a class="btn" href="@routes.PostsController.create">New post...</a>
+}
