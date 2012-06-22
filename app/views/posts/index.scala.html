@@ -8,10 +8,10 @@
       </thead>
       <tbody>
         @for(post <- posts.takeRight(20).reverse) {
-          <tr><td>@post.title</td><td>@post.author</td></tr>
+          <tr><td>@post.content.title</td><td>@post.content.author</td></tr>
         }
       </tbody>
     </table>
-    
-    <a class="btn" href="@routes.PostsController.create">New post...</a>
+
+    <a class="btn" href="@routes.PostsController.renderCreate">New post...</a>
 }

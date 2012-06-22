@@ -7,8 +7,8 @@ GET     /                           controllers.Application.index
 
 GET     /posts                      controllers.Default.redirect(to="/posts/")
 GET     /posts/                     controllers.PostsController.index
-GET     /posts/new                  controllers.PostsController.create
-POST    /posts/                     controllers.PostsController.post
+GET     /posts/new                  controllers.PostsController.renderCreate
+POST    /posts/                     controllers.PostsController.submitCreate
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)
