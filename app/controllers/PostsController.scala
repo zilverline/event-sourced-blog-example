@@ -51,4 +51,10 @@ object PostsController extends Controller {
       })
   }
 
+  def delete(id: UUID) = Action {
+    atomic { implicit txn =>
+      Application.posts.apply(PostDeleted(id))
+      Redirect(routes.PostsController.index)
+    }
+  }
 }

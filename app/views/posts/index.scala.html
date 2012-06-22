@@ -11,7 +11,10 @@
           <tr>
             <td>@post.content.title</td>
             <td>@post.content.author</td>
-            <td><a class="btn" href="@routes.PostsController.renderEdit(post.id)">Edit...</a></td>
+            <td>
+              <a class="btn edit" href="@routes.PostsController.renderEdit(post.id)">Edit...</a>
+              <form style="display: inline;" action="@routes.PostsController.delete(post.id)" method="POST"><button class="btn">Delete</button></form>
+            </td>
           </tr>
         }
       </tbody>
