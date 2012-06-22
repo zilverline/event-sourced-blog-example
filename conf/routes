@@ -8,6 +8,7 @@ GET     /                           controllers.Application.index
 GET     /posts                      controllers.Default.redirect(to="/posts/")
 GET     /posts/                     controllers.PostsController.index
 GET     /posts/new                  controllers.PostsController.renderCreate
+GET     /posts/:id                  controllers.PostsController.show(id: UUID)
 POST    /posts/:id/create           controllers.PostsController.submitCreate(id: UUID)
 GET     /posts/:id/edit             controllers.PostsController.renderEdit(id: UUID)
 POST    /posts/:id/edit             controllers.PostsController.submitEdit(id: UUID)

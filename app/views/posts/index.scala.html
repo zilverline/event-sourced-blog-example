@@ -9,7 +9,7 @@
       <tbody>
         @for(post <- posts) {
           <tr>
-            <td>@post.content.title</td>
+            <td><a href="@routes.PostsController.show(post.id)">@post.content.title</a></td>
             <td>@post.content.author</td>
             <td>
               <a class="btn edit" href="@routes.PostsController.renderEdit(post.id)">Edit...</a>

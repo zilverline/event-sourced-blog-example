@@ -25,6 +25,13 @@ object PostsController extends Controller {
     Ok(views.html.posts.index(Application.posts.current.single().last(20)))
   }
 
+  def show(id: UUID) = Action {
+    Application.posts.current.single().byId.get(id) match {
+      case Some(post) => Ok(views.html.posts.show(post))
+      case None       => NotFound
+    }
+  }
+
   def renderCreate = Action {
     Ok(views.html.posts.create(UUID.randomUUID, postContentForm))
   }
