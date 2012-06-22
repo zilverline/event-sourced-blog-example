@@ -8,7 +8,9 @@ GET     /                           controllers.Application.index
 GET     /posts                      controllers.Default.redirect(to="/posts/")
 GET     /posts/                     controllers.PostsController.index
 GET     /posts/new                  controllers.PostsController.renderCreate
-POST    /posts/                     controllers.PostsController.submitCreate
+POST    /posts/:id/create           controllers.PostsController.submitCreate(id: UUID)
+GET     /posts/:id/edit             controllers.PostsController.renderEdit(id: UUID)
+POST    /posts/:id/edit             controllers.PostsController.submitEdit(id: UUID)
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)

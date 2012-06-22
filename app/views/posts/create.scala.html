@@ -1,16 +1,5 @@
-@(form: Form[events.PostCreated])
-@import java.util.UUID
-@import helper.twitterBootstrap._
+@(id: UUID, form: Form[PostContent])
 
 @main("New blog post") {
-
-  @helper.form(action = routes.PostsController.submitCreate) {
-    <input type="hidden" name="id" value="@form("uuid").value.getOrElse(UUID.randomUUID)">
-    @helper.inputText(form("content")("author"), '_label -> "Author", 'autofocus -> "autofocus", 'required -> "required")
-    @helper.inputText(form("content")("title"), '_label -> "Title", 'size -> 80)
-    @helper.textarea(form("content")("content"), '_label -> "Content", 'cols -> 80, 'rows -> 10)
-
-    <button class="btn btn-primary">Submit</button>
-    <button class="btn">Cancel</button>
-  }
+  @contentForm(label = "Create", action = routes.PostsController.submitCreate(id), form = form)
 }

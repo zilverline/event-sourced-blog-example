@@ -7,8 +7,9 @@ import events._
 
 case class Post(id: UUID, content: PostContent)
 
-case class Posts(byUuid: Map[UUID, Post] = Map.empty) {
+case class Posts(byId: Map[UUID, Post] = Map.empty) {
   def apply(event: PostEvent) = event match {
-    case PostCreated(id, content) => copy(byUuid = byUuid.updated(id, Post(id, content)))
+    case PostCreated(id, content) => copy(byId = byId.updated(id, Post(id, content)))
+    case PostUpdated(id, content) => copy(byId = byId.updated(id, Post(id, content)))
   }
 }

@@ -1,0 +1,6 @@
+@(id: UUID, form: Form[PostContent])
+@import helper.twitterBootstrap._
+
+@main("Edit blog post") {
+  @contentForm(label = "Save", action = routes.PostsController.submitEdit(id), form = form)
+}
