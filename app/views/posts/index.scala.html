@@ -7,7 +7,7 @@
         <tr><th>Title</th><th>Author</th></tr>
       </thead>
       <tbody>
-        @for(post <- posts.takeRight(20).reverse) {
+        @for(post <- posts) {
           <tr>
             <td>@post.content.title</td>
             <td>@post.content.author</td>

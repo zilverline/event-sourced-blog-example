@@ -22,7 +22,7 @@ object PostsController extends Controller {
     "content" -> trimmedText.verifying(minLength(3)))(PostContent.apply)(PostContent.unapply))
 
   def index = Action {
-    Ok(views.html.posts.index(Application.posts.current.single().byId.values.toSeq))
+    Ok(views.html.posts.index(Application.posts.current.single().last(20)))
   }
 
   def renderCreate = Action {
