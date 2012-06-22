@@ -1,7 +1,5 @@
 @(message: String)
 
-@main("Welcome to Play 2.0") {
-
-    @play20.welcome(message)
-
+@main("Welcome to the Scala Blog application using event sourcing") {
+  <p class="alert alert-info">Click on <a href="@routes.PostsController.index">posts</a> to see the current blog posts.</p>
 }

@@ -4,3 +4,7 @@ Example blog application using event sourcing, memory image, and Play! 2.0 with 
 Install play-2.0.2-RC2 (or later) and run "play".
 
 Or install sbt 0.11.3 (or later) and run "sbt".
+
+Now you can execute "play run" (or "sbt run") to start the server. First time the
+internet is downloaded, but after a while you should be able to browse to
+http://localhost:9000/
