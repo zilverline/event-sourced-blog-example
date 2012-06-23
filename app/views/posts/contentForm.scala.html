@@ -1,7 +1,18 @@
-@(label: String, action: Call, form: Form[PostContent])
+@(label: String, action: Call, version: Int, form: Form[PostContent])
 @import helper.twitterBootstrap._
 
 @helper.form(action = action) {
+  @if(form.hasGlobalErrors) {
+    <div class="alert alert-error">
+      <p>Please resolve the following errors</p>
+      <ul>
+        @for(error <- form.globalErrors) {
+          <li>@error.message</li>
+        }
+      </ul>
+    </div>
+  }
+  <input type="hidden" name="version" value="@version"/>
   @helper.inputText(form("author"), '_label -> "Author", 'autofocus -> "autofocus", 'required -> "required")
   @helper.inputText(form("title"), '_label -> "Title", 'size -> 80)
   @helper.textarea(form("content"), '_label -> "Content", 'cols -> 80, 'rows -> 10)

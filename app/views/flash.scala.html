@@ -1,0 +1,11 @@
+@()(implicit request: RequestHeader)
+
+@info = @{ request.flash.get("info") }
+
+@info match {
+  case Some(message) => {
+    <div class="alert alert-success"><button class="close" data-dismiss="alert">×</button>@message</div>
+  }
+  case None => {
+  }
+}

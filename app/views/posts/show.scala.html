@@ -1,4 +1,4 @@
-@(post: Post)
+@(post: Post)(implicit request: RequestHeader)
 
 @main("Post: " + post.content.title) {
   <p>@post.content.content -- <em>by @post.content.title</em></p>
