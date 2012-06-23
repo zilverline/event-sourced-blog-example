@@ -28,6 +28,3 @@ class FakeEventStore[A](onCommit: Commit[A] => Unit) extends EventStore[A] {
     completed(commit)
   }
 }
-object FakeEventStore {
-  def apply[A](onCommit: Commit[A] => Unit) = new FakeEventStore[A](onCommit)
-}

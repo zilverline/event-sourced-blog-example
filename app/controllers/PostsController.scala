@@ -14,7 +14,7 @@ import support.Mappings._
 
 object PostsController extends Controller {
   def eventStore = Application.eventStore
-  def posts = Application.posts.current.single()
+  def posts = Application.posts.single()
 
   val postContentForm = Form(mapping(
     "author" -> trimmedText.verifying(minLength(3)),

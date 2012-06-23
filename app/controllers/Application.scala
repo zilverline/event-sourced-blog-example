@@ -7,17 +7,16 @@ import play.api.Play.current
 import play.api.mvc._
 import events._
 import models._
-import support.MemoryImage
 import eventstore.FakeEventStore
 
 object Application extends Controller {
 
-  val posts = MemoryImage[Posts, PostEvent](Posts()) { _ apply _ }
-  val eventStore = FakeEventStore[PostEvent] { commit =>
-    atomic { implicit txn =>
-      commit.events.foreach { event => posts.apply(event.payload) }
+  val posts = Ref(Posts())
+  val eventStore = new FakeEventStore[PostEvent](onCommit = { commit =>
+    posts.single.transform { posts =>
+      commit.events.map(_.payload).foldLeft(posts) { _ apply _ }
     }
-  }
+  })
 
   if (Play.isDev) {
     var id = UUID.fromString("4e885ffe-870e-45b4-b5dd-f16d381d6f5f")
@@ -29,5 +28,4 @@ object Application extends Controller {
   def index = Action { implicit request =>
     Ok(views.html.index())
   }
-
 }

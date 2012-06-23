@@ -1,7 +1,6 @@
 package models
 
 import java.util.UUID
-import support.MemoryImage
 
 import events._
 
