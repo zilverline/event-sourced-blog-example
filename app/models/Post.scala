@@ -14,5 +14,6 @@ case class Posts(byId: Map[UUID, Post] = Map.empty, all: Seq[UUID] = Vector.empt
     case PostDeleted(id)          => copy(byId = byId - id, all = all.filterNot(_ == id))
   }
 
+  def get(id: UUID) = byId.get(id)
   def last(n: Int) = all.takeRight(n).reverse.map(byId)
 }

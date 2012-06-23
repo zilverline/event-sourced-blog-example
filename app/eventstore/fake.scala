@@ -4,7 +4,7 @@ import java.util.UUID
 import scala.concurrent.stm._
 import org.joda.time.DateTimeUtils
 
-class FakeEventStore[A](notify: Commit[A] => Unit) extends EventStore[A] {
+class FakeEventStore[A](onCommit: Commit[A] => Unit) extends EventStore[A] {
   private[this] val commitCount = Ref[Long](0)
   private[this] val stored = TMap.empty[UUID, Seq[CommittedEvent[A]]]
 
@@ -24,10 +24,10 @@ class FakeEventStore[A](notify: Commit[A] => Unit) extends EventStore[A] {
       }
     }
 
-    commit.right.foreach(notify)
+    commit.right.foreach(onCommit)
     completed(commit)
   }
 }
 object FakeEventStore {
-  def apply[A](notify: Commit[A] => Unit) = new FakeEventStore[A](notify)
+  def apply[A](onCommit: Commit[A] => Unit) = new FakeEventStore[A](onCommit)
 }

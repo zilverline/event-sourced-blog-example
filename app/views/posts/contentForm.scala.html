@@ -1,4 +1,4 @@
-@(label: String, action: Call, version: Int, form: Form[PostContent])
+@(label: String, action: Call, form: Form[PostContent])
 @import helper.twitterBootstrap._
 
 @helper.form(action = action) {
@@ -12,11 +12,14 @@
       </ul>
     </div>
   }
-  <input type="hidden" name="version" value="@version"/>
-  @helper.inputText(form("author"), '_label -> "Author", 'autofocus -> "autofocus", 'required -> "required")
-  @helper.inputText(form("title"), '_label -> "Title", 'size -> 80)
-  @helper.textarea(form("content"), '_label -> "Content", 'cols -> 80, 'rows -> 10)
+  <fieldset>
+    @helper.inputText(form("author"), '_label -> "Author", 'autofocus -> "autofocus", 'required -> "required")
+    @helper.inputText(form("title"), '_label -> "Title", 'size -> 80)
+    @helper.textarea(form("content"), '_label -> "Content", 'cols -> 80, 'rows -> 10)
+  </fieldset>
 
-  <button class="btn btn-primary">@label</button>
-  <button class="btn">Cancel</button>
+  <fieldset>
+    <button class="btn btn-primary">@label</button>
+    <a class="btn" href="@routes.PostsController.index()">Cancel</a>
+  </fieldset>
 }
