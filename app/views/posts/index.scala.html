@@ -12,7 +12,7 @@
             <td><a href="@routes.PostsController.show(post.id)">@post.content.title</a></td>
             <td>@post.content.author</td>
             <td>
-              <form style="form-inline" action="@routes.PostsController.delete(post.id, post.version)" method="POST">
+              <form style="form-inline" action="@routes.PostsController.delete(post.id)" method="POST">
                 <a class="btn edit" href="@routes.PostsController.renderEdit(post.id)">Edit...</a>
                 <button class="btn">Delete</button>
               </form>

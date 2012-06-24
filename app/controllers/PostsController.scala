@@ -13,8 +13,17 @@ import models._
 import support.Mappings._
 
 object PostsController extends Controller {
-  def eventStore = Application.eventStore
-  def posts = Application.posts.single()
+
+  val memoryImage = {
+    val initialEvents = Seq(
+      PostCreated(UUID.fromString("4e885ffe-870e-45b4-b5dd-f16d381d6f6a"), PostContent("Erik", "Scala is awesome", "Scala...")),
+      PostCreated(UUID.fromString("4e885ffe-870e-45b4-b5dd-f16d381d6f6f"), PostContent("Bas", "Righteous Ruby", "Ruby...")))
+    val initialValue = initialEvents.foldLeft(Posts())(_ apply _)
+    Ref(initialValue).single
+  }
+
+  def posts = memoryImage()
+  def commit(event: PostEvent) = memoryImage.transform(_.apply(event))
 
   val postContentForm = Form(mapping(
     "author" -> trimmedText.verifying(minLength(3)),
@@ -22,7 +31,7 @@ object PostsController extends Controller {
     "content" -> trimmedText.verifying(minLength(3)))(PostContent.apply)(PostContent.unapply))
 
   def index = Action { implicit request =>
-    Ok(views.html.posts.index(posts.last(20)))
+    Ok(views.html.posts.index(posts.mostRecent(20)))
   }
 
   def show(id: UUID) = Action { implicit request =>
@@ -38,33 +47,31 @@ object PostsController extends Controller {
 
   def submitCreate(id: UUID) = Action { implicit request =>
     postContentForm.bindFromRequest.fold(
-      errors => BadRequest(views.html.posts.create(id, errors)),
-      content => eventStore.commit(id, 0, PostCreated(id, content)) {
-        case Left(conflict) => Conflict(todo())
-        case Right(commit)  => Redirect(routes.PostsController.index).flashing("info" -> "Post created.")
+      formWithErrors => BadRequest(views.html.posts.create(id, formWithErrors)),
+      postContent => {
+        commit(PostCreated(id, postContent))
+        Redirect(routes.PostsController.index).flashing("info" -> "Post created.")
       })
   }
 
   def renderEdit(id: UUID) = Action { implicit request =>
     posts.get(id) match {
-      case Some(post) => Ok(views.html.posts.edit(id, post.version, postContentForm.fill(post.content)))
+      case Some(post) => Ok(views.html.posts.edit(id, postContentForm.fill(post.content)))
       case None       => NotFound(notFound(request, None))
     }
   }
 
-  def submitEdit(id: UUID, version: Int) = Action { implicit request =>
+  def submitEdit(id: UUID) = Action { implicit request =>
     postContentForm.bindFromRequest.fold(
-      errors => BadRequest(views.html.posts.edit(id, version, errors)),
-      content => eventStore.commit(id, version, PostUpdated(id, content)) {
-        case Left(conflict) => Conflict(todo())
-        case Right(commit)  => Redirect(routes.PostsController.index).flashing("info" -> "Post saved.")
+      formWithErrors => BadRequest(views.html.posts.edit(id, formWithErrors)),
+      postContent => {
+        commit(PostUpdated(id, postContent))
+        Redirect(routes.PostsController.index).flashing("info" -> "Post saved.")
       })
   }
 
-  def delete(id: UUID, version: Int) = Action { implicit request =>
-    eventStore.commit(id, version, PostDeleted(id)) {
-      case Left(conflict) => Conflict(todo())
-      case Right(commit)  => Redirect(routes.PostsController.index).flashing("info" -> "Post deleted.")
-    }
+  def delete(id: UUID) = Action { implicit request =>
+    commit(PostDeleted(id))
+    Redirect(routes.PostsController.index).flashing("info" -> "Post deleted.")
   }
 }
