@@ -22,7 +22,10 @@ object PostsController extends Controller {
     Ref(initialValue).single
   }
 
-  def commit(event: PostEvent) = posts.transform(_.apply(event))
+  def commit(event: PostEvent) = {
+    posts.transform(_.apply(event))
+    Logger.debug("Committed event: " + event)
+  }
 
   val postContentForm = Form(mapping(
     "author" -> trimmedText.verifying(minLength(3)),
