@@ -11,19 +11,18 @@ import events._
 import models._
 import support.Mappings._
 
-object PostsController extends Controller {
+object PostsController extends PostsController(
+  // Some handy test data.
+  Posts()
+    .apply(PostCreated(PostId("4e885ffe-870e-45b4-b5dd-f16d381d6f6a"), PostContent("Erik", "Scala is awesome", "Scala...")))
+    .apply(PostCreated(PostId("4e885ffe-870e-45b4-b5dd-f16d381d6f6f"), PostContent("Bas", "Righteous Ruby", "Ruby..."))))
+
+class PostsController(initialPosts: Posts) extends Controller {
 
   /**
    * A Scala STM reference holding the current state of the application, derived from all committed events.
    */
-  val posts = {
-    // Handy test data.
-    val initialEvents = Seq(
-      PostCreated(PostId("4e885ffe-870e-45b4-b5dd-f16d381d6f6a"), PostContent("Erik", "Scala is awesome", "Scala...")),
-      PostCreated(PostId("4e885ffe-870e-45b4-b5dd-f16d381d6f6f"), PostContent("Bas", "Righteous Ruby", "Ruby...")))
-    val initialValue = initialEvents.foldLeft(Posts())(_ apply _)
-    Ref(initialValue).single
-  }
+  val posts = Ref(initialPosts).single
 
   /**
    * Commits an event and applies it to the current state.
