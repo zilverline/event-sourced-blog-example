@@ -1,4 +1,4 @@
-@(id: UUID, form: Form[PostContent])(implicit request: RequestHeader)
+@(id: PostId, form: Form[PostContent])(implicit request: RequestHeader)
 
 @main("New blog post") {
   @contentForm(label = "Create", action = routes.PostsController.submitCreate(id), form = form)

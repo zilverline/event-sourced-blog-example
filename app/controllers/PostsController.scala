@@ -1,6 +1,5 @@
 package controllers
 
-import java.util.UUID
 import scala.concurrent.stm._
 import play.api._
 import play.api.mvc._
@@ -20,8 +19,8 @@ object PostsController extends Controller {
   val posts = {
     // Handy test data.
     val initialEvents = Seq(
-      PostCreated(UUID.fromString("4e885ffe-870e-45b4-b5dd-f16d381d6f6a"), PostContent("Erik", "Scala is awesome", "Scala...")),
-      PostCreated(UUID.fromString("4e885ffe-870e-45b4-b5dd-f16d381d6f6f"), PostContent("Bas", "Righteous Ruby", "Ruby...")))
+      PostCreated(PostId("4e885ffe-870e-45b4-b5dd-f16d381d6f6a"), PostContent("Erik", "Scala is awesome", "Scala...")),
+      PostCreated(PostId("4e885ffe-870e-45b4-b5dd-f16d381d6f6f"), PostContent("Bas", "Righteous Ruby", "Ruby...")))
     val initialValue = initialEvents.foldLeft(Posts())(_ apply _)
     Ref(initialValue).single
   }
@@ -44,7 +43,7 @@ object PostsController extends Controller {
   /**
    * Show a specific blog post.
    */
-  def show(id: UUID) = Action { implicit request =>
+  def show(id: PostId) = Action { implicit request =>
     posts().get(id) match {
       case Some(post) => Ok(views.html.posts.show(post))
       case None       => NotFound(notFound(request, None))
@@ -55,13 +54,13 @@ object PostsController extends Controller {
    * Show the form to create a new blog post.
    */
   def renderCreate = Action { implicit request =>
-    Ok(views.html.posts.create(UUID.randomUUID, postContentForm))
+    Ok(views.html.posts.create(PostId.generate(), postContentForm))
   }
 
   /**
    * Process the new blog post form.
    */
-  def submitCreate(id: UUID) = Action { implicit request =>
+  def submitCreate(id: PostId) = Action { implicit request =>
     postContentForm.bindFromRequest.fold(
       formWithErrors => BadRequest(views.html.posts.create(id, formWithErrors)),
       postContent => {
@@ -73,7 +72,7 @@ object PostsController extends Controller {
   /**
    * Show the form to edit an existing blog post.
    */
-  def renderEdit(id: UUID) = Action { implicit request =>
+  def renderEdit(id: PostId) = Action { implicit request =>
     posts().get(id) match {
       case Some(post) => Ok(views.html.posts.edit(id, postContentForm.fill(post.content)))
       case None       => NotFound(notFound(request, None))
@@ -83,7 +82,7 @@ object PostsController extends Controller {
   /**
    * Process an edited blog post.
    */
-  def submitEdit(id: UUID) = Action { implicit request =>
+  def submitEdit(id: PostId) = Action { implicit request =>
     postContentForm.bindFromRequest.fold(
       formWithErrors => BadRequest(views.html.posts.edit(id, formWithErrors)),
       postContent => {
@@ -95,7 +94,7 @@ object PostsController extends Controller {
   /**
    * Delete a blog post.
    */
-  def delete(id: UUID) = Action { implicit request =>
+  def delete(id: PostId) = Action { implicit request =>
     commit(PostDeleted(id))
     Redirect(routes.PostsController.index).flashing("info" -> "Post deleted.")
   }

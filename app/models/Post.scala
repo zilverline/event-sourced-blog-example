@@ -1,18 +1,17 @@
 package models
 
-import java.util.UUID
 import events._
 
 /**
  * A specific blog post with its current content.
  */
-case class Post(id: UUID, content: PostContent)
+case class Post(id: PostId, content: PostContent)
 
 /**
  * The current state of blog posts, derived from all committed PostEvents.
  */
-case class Posts(byId: Map[UUID, Post] = Map.empty, all: Seq[UUID] = Vector.empty) {
-  def get(id: UUID) = byId.get(id)
+case class Posts(byId: Map[PostId, Post] = Map.empty, all: Seq[PostId] = Vector.empty) {
+  def get(id: PostId) = byId.get(id)
   def mostRecent(n: Int) = all.takeRight(n).reverse.map(byId)
 
   def apply(event: PostEvent) = event match {

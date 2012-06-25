@@ -10,8 +10,8 @@ object ApplicationBuild extends Build {
   val appDependencies = Seq.empty
 
   val main = PlayProject(appName, appVersion, appDependencies, mainLang = SCALA).settings(
-    routesImport ++= Seq("java.util.UUID", "support.Binders._"),
-    templatesImport ++= Seq("java.util.UUID", "events._"),
+    routesImport ++= Seq("events.PostId", "support.Binders._"),
+    templatesImport ++= Seq("events._"),
     lessEntryPoints <<= (sourceDirectory in Compile)(base => (
       (base / "assets" / "stylesheets" / "bootstrap" / "bootstrap.less") +++
       (base / "assets" / "stylesheets" / "bootstrap" / "responsive.less"))))

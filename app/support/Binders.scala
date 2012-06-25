@@ -1,15 +1,15 @@
 package support
 
 import java.net.URLDecoder
-import java.util.UUID
+import events.PostId
 
 object Binders {
-  implicit object pathBindableUuid extends play.api.mvc.PathBindable[UUID] {
+  implicit object pathBindablePostId extends play.api.mvc.PathBindable[PostId] {
     override def bind(key: String, value: String) = try {
-      Right(UUID.fromString(URLDecoder.decode(value, "utf-8")))
+      Right(PostId(URLDecoder.decode(value, "utf-8")))
     } catch {
       case _: Exception => Left("Cannot parse parameter " + key + " as UUID: " + URLDecoder.decode(value, "utf-8"))
     }
-    override def unbind(key: String, value: UUID) = value.toString
+    override def unbind(key: String, value: PostId) = value.uuid.toString
   }
 }

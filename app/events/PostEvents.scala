@@ -3,6 +3,15 @@ package events
 import java.util.UUID
 
 /**
+ * Strongly typed identifier for posts.
+ */
+case class PostId(uuid: UUID)
+object PostId {
+  def apply(s: String): PostId = PostId(UUID.fromString(s))
+  def generate(): PostId = PostId(UUID.randomUUID())
+}
+
+/**
  * Content that is always present for a blog post.
  */
 case class PostContent(author: String, title: String, content: String)
@@ -13,6 +22,6 @@ case class PostContent(author: String, title: String, content: String)
  * to be stable, with no or few external dependencies.
  */
 sealed trait PostEvent
-case class PostCreated(postId: UUID, content: PostContent) extends PostEvent
-case class PostUpdated(postId: UUID, content: PostContent) extends PostEvent
-case class PostDeleted(postId: UUID) extends PostEvent
+case class PostCreated(postId: PostId, content: PostContent) extends PostEvent
+case class PostUpdated(postId: PostId, content: PostContent) extends PostEvent
+case class PostDeleted(postId: PostId) extends PostEvent
