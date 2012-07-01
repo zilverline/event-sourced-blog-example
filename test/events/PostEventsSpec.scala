@@ -34,10 +34,10 @@ object PostEventsSpec {
   implicit val arbitraryPostContent: Arbitrary[PostContent] = Arbitrary(Gen.resultOf(PostContent.apply _))
 
   def eventsForSinglePost(id: PostId): Arbitrary[List[PostEvent]] = Arbitrary(for {
-    created <- Gen.resultOf(PostCreated(id, _: PostContent))
-    updates <- Gen.listOf(Gen.resultOf(PostUpdated(id, _: PostContent)))
-    deleted <- Gen.oneOf(Nil, Nil, List(PostDeleted(id)))
-  } yield created :: updates ::: deleted)
+    added <- Gen.resultOf(PostAdded(id, _: PostContent))
+    edits <- Gen.listOf(Gen.resultOf(PostEdited(id, _: PostContent)))
+    deleted <- Gen.frequency(3 -> Nil, 1 -> List(PostDeleted(id)))
+  } yield added :: edits ::: deleted)
 
   val eventsForMultiplePosts: Arbitrary[List[PostEvent]] = Arbitrary(for {
     events <- Gen.listOf(arbitrary[PostId].flatMap { id => Gen.resize(5, arbitrary(eventsForSinglePost(id))) })

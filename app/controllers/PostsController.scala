@@ -13,10 +13,10 @@ import support.Mappings._
 
 object PostsController extends PostsController(
   // Some handy test data.
-  Posts(events = Seq(
-    PostCreated(PostId.fromString("PostId(4e885ffe-870e-45b4-b5dd-f16d381d6f6a)").get, PostContent("Mark", "The power of feedback in Scrum", "Searching the web for ...")),
-    PostCreated(PostId.fromString("PostId(4e885ffe-870e-45b4-b5dd-f16d381d6f6f)").get, PostContent("Erik", "Picking the right abstraction", "Recently I had to ...")),
-    PostCreated(PostId.fromString("PostId(4e885ffe-870e-45b4-b5dd-f16d381d6f6c)").get, PostContent("Michael", "Architect in Scrum", "Last friday I gave ...")))))
+  Posts.fromHistory(
+    PostAdded(PostId.fromString("PostId(4e885ffe-870e-45b4-b5dd-f16d381d6f6a)").get, PostContent("Mark", "The power of feedback in Scrum", "Searching the web for ...")),
+    PostAdded(PostId.fromString("PostId(4e885ffe-870e-45b4-b5dd-f16d381d6f6f)").get, PostContent("Erik", "Picking the right abstraction", "Recently I had to ...")),
+    PostAdded(PostId.fromString("PostId(4e885ffe-870e-45b4-b5dd-f16d381d6f6c)").get, PostContent("Michael", "Architect in Scrum", "Last friday I gave ..."))))
 
 class PostsController(initialPosts: Posts) extends Controller {
 
@@ -51,44 +51,42 @@ class PostsController(initialPosts: Posts) extends Controller {
   }
 
   /**
-   * Show the form to create a new blog post.
+   * Show and submit actions for adding a new blog post.
    */
-  def renderCreate = Action { implicit request =>
-    Ok(views.html.posts.create(PostId.generate(), postContentForm))
-  }
+  object add {
+    def show = Action { implicit request =>
+      Ok(views.html.posts.add(PostId.generate(), postContentForm))
+    }
 
-  /**
-   * Process the new blog post form.
-   */
-  def submitCreate(id: PostId) = Action { implicit request =>
-    postContentForm.bindFromRequest.fold(
-      formWithErrors => BadRequest(views.html.posts.create(id, formWithErrors)),
-      postContent => {
-        commit(PostCreated(id, postContent))
-        Redirect(routes.PostsController.show(id)).flashing("info" -> "Post created.")
-      })
-  }
-
-  /**
-   * Show the form to edit an existing blog post.
-   */
-  def renderEdit(id: PostId) = Action { implicit request =>
-    posts().get(id) match {
-      case Some(post) => Ok(views.html.posts.edit(id, postContentForm.fill(post.content)))
-      case None       => NotFound(notFound(request, None))
+    def submit(id: PostId) = Action { implicit request =>
+      postContentForm.bindFromRequest.fold(
+        formWithErrors => BadRequest(views.html.posts.add(id, formWithErrors)),
+        postContent => {
+          commit(PostAdded(id, postContent))
+          Redirect(routes.PostsController.show(id)).flashing("info" -> "Post created.")
+        })
     }
   }
 
   /**
-   * Process an edited blog post.
+   * Show and submit actions for editing an existing blog post.
    */
-  def submitEdit(id: PostId) = Action { implicit request =>
-    postContentForm.bindFromRequest.fold(
-      formWithErrors => BadRequest(views.html.posts.edit(id, formWithErrors)),
-      postContent => {
-        commit(PostUpdated(id, postContent))
-        Redirect(routes.PostsController.show(id)).flashing("info" -> "Post saved.")
-      })
+  object edit {
+    def show(id: PostId) = Action { implicit request =>
+      posts().get(id) match {
+        case Some(post) => Ok(views.html.posts.edit(id, postContentForm.fill(post.content)))
+        case None       => NotFound(notFound(request, None))
+      }
+    }
+
+    def submit(id: PostId) = Action { implicit request =>
+      postContentForm.bindFromRequest.fold(
+        formWithErrors => BadRequest(views.html.posts.edit(id, formWithErrors)),
+        postContent => {
+          commit(PostEdited(id, postContent))
+          Redirect(routes.PostsController.show(id)).flashing("info" -> "Post saved.")
+        })
+    }
   }
 
   /**

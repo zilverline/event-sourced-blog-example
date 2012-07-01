@@ -15,7 +15,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
 
   "posts controller" should {
     "list posts" in {
-      subject.commit(PostCreated(postId, postContent))
+      subject.commit(PostAdded(postId, postContent))
 
       val result = subject.index(FakeRequest())
 
@@ -23,24 +23,24 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
       contentAsString(result) must contain("<td>author</td>")
     }
 
-    "create post" in {
-      val result = subject.submitCreate(postId)(FakeRequest().withFormUrlEncodedBody("author" -> "author", "title" -> "title", "content" -> "content"))
+    "add post" in {
+      val result = subject.add.submit(postId)(FakeRequest().withFormUrlEncodedBody("author" -> "author", "title" -> "title", "content" -> "content"))
 
       status(result) must_== 303
       subject.posts() must_== Posts(Map(postId -> Post(postId, postContent)), Seq(postId))
     }
 
     "edit post" in {
-      subject.commit(PostCreated(postId, postContent))
+      subject.commit(PostAdded(postId, postContent))
 
-      val result = subject.submitEdit(postId)(FakeRequest().withFormUrlEncodedBody("author" -> "edited author", "title" -> "edited title", "content" -> "edited content"))
+      val result = subject.edit.submit(postId)(FakeRequest().withFormUrlEncodedBody("author" -> "edited author", "title" -> "edited title", "content" -> "edited content"))
 
       status(result) must_== 303
       subject.posts() must_== Posts(Map(postId -> Post(postId, PostContent("edited author", "edited title", "edited content"))), Seq(postId))
     }
 
     "delete post" in {
-      subject.commit(PostCreated(postId, postContent))
+      subject.commit(PostAdded(postId, postContent))
 
       val result = subject.delete(postId)(FakeRequest())
 

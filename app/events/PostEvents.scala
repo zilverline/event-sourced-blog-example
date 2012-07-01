@@ -31,6 +31,6 @@ case class PostContent(author: String, title: String, content: String)
 sealed trait PostEvent {
   def postId: PostId
 }
-case class PostCreated(postId: PostId, content: PostContent) extends PostEvent
-case class PostUpdated(postId: PostId, content: PostContent) extends PostEvent
+case class PostAdded(postId: PostId, content: PostContent) extends PostEvent
+case class PostEdited(postId: PostId, content: PostContent) extends PostEvent
 case class PostDeleted(postId: PostId) extends PostEvent

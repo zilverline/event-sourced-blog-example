@@ -16,11 +16,11 @@ case class Posts(byId: Map[PostId, Post] = Map.empty, all: Seq[PostId] = Vector.
   def mostRecent(n: Int) = all.takeRight(n).reverse.map(byId)
 
   def apply(event: PostEvent) = event match {
-    case PostCreated(id, content) => copy(byId = byId.updated(id, Post(id, content)), all = all :+ id)
-    case PostUpdated(id, content) => copy(byId = byId.updated(id, byId(id).copy(content = content)))
-    case PostDeleted(id)          => copy(byId = byId - id, all = all.filterNot(_ == id))
+    case PostAdded(id, content)  => copy(byId = byId.updated(id, Post(id, content)), all = all :+ id)
+    case PostEdited(id, content) => copy(byId = byId.updated(id, byId(id).copy(content = content)))
+    case PostDeleted(id)         => copy(byId = byId - id, all = all.filterNot(_ == id))
   }
 }
 object Posts {
-  def apply(events: Seq[PostEvent]): Posts = events.foldLeft(Posts())(_ apply _)
+  def fromHistory(events: PostEvent*): Posts = events.foldLeft(Posts())(_ apply _)
 }

@@ -15,7 +15,7 @@
             <td>
               <form class="form-inline input-prepend" action="@routes.PostsController.delete(post.id)" method="POST">
                 <a class="btn" href="@routes.PostsController.show(post.id)">Show</a>
-                <a class="btn" href="@routes.PostsController.renderEdit(post.id)">Edit</a>
+                <a class="btn" href="@routes.PostsController.edit.show(post.id)">Edit</a>
                 <button class="btn">Delete</button>
               </form>
             </td>
@@ -24,5 +24,5 @@
       </tbody>
     </table>
 
-    <a class="btn" href="@routes.PostsController.renderCreate">New Post</a>
+    <a class="btn" href="@routes.PostsController.add.show">New Post</a>
 }

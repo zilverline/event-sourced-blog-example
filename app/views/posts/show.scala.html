@@ -3,7 +3,7 @@
 @main("Post: " + post.content.title) {
   <p>@post.content.content -- <em>by @post.content.title</em></p>
   <p>
-    <a class="btn" href="@routes.PostsController.renderEdit(post.id)">Edit...</a>
+    <a class="btn" href="@routes.PostsController.edit.show(post.id)">Edit...</a>
     <a class="btn" href="@routes.PostsController.index">Back</a>
   </p>
 }
