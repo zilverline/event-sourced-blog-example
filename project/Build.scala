@@ -7,7 +7,7 @@ object ApplicationBuild extends Build {
   val appName = "play-blog"
   val appVersion = "1.0-SNAPSHOT"
 
-  val appDependencies = Seq.empty
+  val appDependencies = Seq("org.scalacheck" %% "scalacheck" % "1.9" % "test")
 
   val main = PlayProject(appName, appVersion, appDependencies, mainLang = SCALA).settings(
     routesImport ++= Seq("events.PostId", "support.Binders._"),

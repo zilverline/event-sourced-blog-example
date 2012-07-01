@@ -1,14 +1,21 @@
 package events
 
 import java.util.UUID
+import scala.util.control.Exception.catching
 
 /**
  * Strongly typed identifier for posts.
  */
 case class PostId(uuid: UUID)
 object PostId {
-  def apply(s: String): PostId = PostId(UUID.fromString(s))
   def generate(): PostId = PostId(UUID.randomUUID())
+
+  def fromString(s: String): Option[PostId] = s match {
+    case PostIdRegex(uuid) => catching(classOf[RuntimeException]) opt { PostId(UUID.fromString(uuid)) }
+    case _                 => None
+  }
+
+  private val PostIdRegex = """PostId\(([a-fA-F0-9-]{36})\)""".r
 }
 
 /**
@@ -21,7 +28,9 @@ case class PostContent(author: String, title: String, content: String)
  * be serialized to durable storage and may be retrieved for many years, they need
  * to be stable, with no or few external dependencies.
  */
-sealed trait PostEvent
+sealed trait PostEvent {
+  def postId: PostId
+}
 case class PostCreated(postId: PostId, content: PostContent) extends PostEvent
 case class PostUpdated(postId: PostId, content: PostContent) extends PostEvent
 case class PostDeleted(postId: PostId) extends PostEvent

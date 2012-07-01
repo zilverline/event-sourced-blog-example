@@ -13,9 +13,10 @@ import support.Mappings._
 
 object PostsController extends PostsController(
   // Some handy test data.
-  Posts()
-    .apply(PostCreated(PostId("4e885ffe-870e-45b4-b5dd-f16d381d6f6a"), PostContent("Erik", "Scala is awesome", "Scala...")))
-    .apply(PostCreated(PostId("4e885ffe-870e-45b4-b5dd-f16d381d6f6f"), PostContent("Bas", "Righteous Ruby", "Ruby..."))))
+  Posts(events = Seq(
+    PostCreated(PostId.fromString("PostId(4e885ffe-870e-45b4-b5dd-f16d381d6f6a)").get, PostContent("Mark", "The power of feedback in Scrum", "Searching the web for ...")),
+    PostCreated(PostId.fromString("PostId(4e885ffe-870e-45b4-b5dd-f16d381d6f6f)").get, PostContent("Erik", "Picking the right abstraction", "Recently I had to ...")),
+    PostCreated(PostId.fromString("PostId(4e885ffe-870e-45b4-b5dd-f16d381d6f6c)").get, PostContent("Michael", "Architect in Scrum", "Last friday I gave ...")))))
 
 class PostsController(initialPosts: Posts) extends Controller {
 
