@@ -63,7 +63,7 @@ class PostsController(initialPosts: Posts) extends Controller {
         formWithErrors => BadRequest(views.html.posts.add(id, formWithErrors)),
         postContent => {
           commit(PostAdded(id, postContent))
-          Redirect(routes.PostsController.show(id)).flashing("info" -> "Post created.")
+          Redirect(routes.PostsController.show(id)).flashing("info" -> "Post added.")
         })
     }
   }
