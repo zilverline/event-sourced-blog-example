@@ -28,7 +28,7 @@ class PostsController(initialPosts: Posts) extends Controller {
   /**
    * Commits an event and applies it to the current state.
    */
-  def commit(event: PostEvent) = {
+  def commit(event: PostEvent): Unit = {
     posts.transform(_.apply(event))
     Logger.debug("Committed event: " + event)
   }

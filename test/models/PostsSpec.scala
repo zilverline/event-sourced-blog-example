@@ -37,7 +37,7 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
         val deletedIds = events.collect { case PostDeleted(id) => id }.toSet
         val remainingIds = events.collect { case PostAdded(id, _) => id }.filterNot(deletedIds)
 
-        posts.mostRecent(Int.MaxValue) must_== remainingIds.map(posts).reverse
+        posts.mostRecent(Int.MaxValue) must_== remainingIds.flatMap(posts.get).reverse
       }
     }
   }
