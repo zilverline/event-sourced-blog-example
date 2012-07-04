@@ -1,7 +1,10 @@
 Example blog application using event sourcing, memory image, and Play! 2.0 with Scala
 =====================================================================================
 
-Install play-2.0.2 (or later) and run "play".
+See http://blog.zilverline.com/2012/07/04/simple-event-sourcing-introduction-part-1/
+for the accompanying blog series.
+
+To run the application install play-2.0.2 (or later) and run "play".
 
 Or install sbt 0.11.3 (or later) and run "sbt".
 
