@@ -10,8 +10,8 @@ GET     /posts/                     controllers.PostsController.index
 GET     /posts/new                  controllers.PostsController.add.show
 POST    /posts/:id/add              controllers.PostsController.add.submit(id: PostId)
 GET     /posts/:id/edit             controllers.PostsController.edit.show(id: PostId)
-POST    /posts/:id/edit             controllers.PostsController.edit.submit(id: PostId)
-POST    /posts/:id/delete           controllers.PostsController.delete(id: PostId)
+POST    /posts/:id/edit             controllers.PostsController.edit.submit(id: PostId, r: StreamRevision)
+POST    /posts/:id/delete           controllers.PostsController.delete(id: PostId, r: StreamRevision)
 GET     /posts/:id                  controllers.PostsController.show(id: PostId)
 
 # Map static resources from the /public folder to the /assets URL path

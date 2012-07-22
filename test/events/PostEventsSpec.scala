@@ -1,5 +1,6 @@
 package events
 
+import java.util.UUID
 import org.scalacheck._, Arbitrary.arbitrary, Prop.forAll
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
@@ -11,11 +12,11 @@ class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.Sc
       id must_== id
     }
 
-    "be unique" in forAll { (a: PostId, b: PostId) =>
+    "generate unique values" in forAll { (a: PostId, b: PostId) =>
       a must_!= b
     }
 
-    "be convertable to and from Strings" in forAll { (id: PostId) =>
+    "convert to and from Strings" in forAll { (id: PostId) =>
       PostId.fromString(id.toString) must beSome(id)
     }
 
@@ -40,6 +41,6 @@ object PostEventsSpec {
   } yield added :: edits ::: deleted)
 
   val eventsForMultiplePosts: Arbitrary[List[PostEvent]] = Arbitrary(for {
-    events <- Gen.listOf(arbitrary[PostId].flatMap { id => Gen.resize(5, arbitrary(eventsForSinglePost(id))) })
+    events <- Gen.resize(10, Gen.listOf(arbitrary[PostId].flatMap { id => Gen.resize(5, arbitrary(eventsForSinglePost(id))) }))
   } yield events.flatten)
 }
