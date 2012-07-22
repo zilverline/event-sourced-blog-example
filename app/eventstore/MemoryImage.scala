@@ -11,7 +11,7 @@ object MemoryImage {
 
 /**
  * A `MemoryImage` tracks an underlying event store and uses the provided
- * `initialState` and `update` to project the committed events unto the
+ * `initialState` and `update` to project the committed events onto the
  * current state.
  */
 class MemoryImage[State, Event] private (eventStore: EventStore[Event])(initialState: State)(update: (State, Commit[Event]) => State) extends EventCommitter[Event] {

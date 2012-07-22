@@ -80,11 +80,11 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
       }
     }
 
-    def submit(id: PostId, revision: StreamRevision) = Action { implicit request =>
+    def submit(id: PostId, expected: StreamRevision) = Action { implicit request =>
       postContentForm.bindFromRequest.fold(
-        formWithErrors => BadRequest(views.html.posts.edit(id, revision, formWithErrors)),
+        formWithErrors => BadRequest(views.html.posts.edit(id, expected, formWithErrors)),
         postContent =>
-          commit(revision, PostEdited(id, postContent)) { commit =>
+          commit(expected, PostEdited(id, postContent)) { commit =>
             Redirect(routes.PostsController.show(id)).flashing("info" -> "Post saved.")
           })
     }
@@ -93,8 +93,8 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
   /**
    * Delete a blog post.
    */
-  def delete(id: PostId, revision: StreamRevision) = Action { implicit request =>
-    commit(revision, PostDeleted(id)) { commit =>
+  def delete(id: PostId, expected: StreamRevision) = Action { implicit request =>
+    commit(expected, PostDeleted(id)) { commit =>
       Redirect(routes.PostsController.index).flashing("info" -> "Post deleted.")
     }
   }
