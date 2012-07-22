@@ -42,19 +42,23 @@ class FakeEventStore[Event] extends EventStore[Event] {
   override object committer extends EventCommitter[Event] {
     import reader._
 
-    override def tryCommit(streamId: String, expected: StreamRevision, event: Event): CommitResult[Event] = atomic { implicit txn =>
-      val actual = streamRevision(streamId)
+    override def tryCommit(streamId: String, expected: StreamRevision, event: Event): CommitResult[Event] = {
+      require(Txn.findCurrent.isEmpty, "the fake event store cannot participate in an STM transaction, just like a real event store")
 
-      if (expected < actual) {
-        val conflicting = readStream(streamId, since = expected)
-        Left(Conflict(streamId, actual, expected, conflicting))
-      } else if (expected > actual) {
-        throw new IllegalArgumentException("expected revision %d greater than actual revision %d" format (expected.value, actual.value))
-      } else {
-        val commit = Commit(storeRevision.next, DateTimeUtils.currentTimeMillis, streamId, actual.next, Seq(event))
-        commits.transform(_ :+ commit)
-        streams.transform(streams => streams.updated(streamId, streams.getOrElse(streamId, Vector.empty) :+ commit))
-        Right(commit)
+      atomic { implicit txn =>
+        val actual = streamRevision(streamId)
+
+        if (expected < actual) {
+          val conflicting = readStream(streamId, since = expected)
+          Left(Conflict(streamId, actual, expected, conflicting))
+        } else if (expected > actual) {
+          throw new IllegalArgumentException("expected revision %d greater than actual revision %d" format (expected.value, actual.value))
+        } else {
+          val commit = Commit(storeRevision.next, DateTimeUtils.currentTimeMillis, streamId, actual.next, Seq(event))
+          commits.transform(_ :+ commit)
+          streams.transform(streams => streams.updated(streamId, streams.getOrElse(streamId, Vector.empty) :+ commit))
+          Right(commit)
+        }
       }
     }
   }
