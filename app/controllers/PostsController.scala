@@ -103,5 +103,5 @@ class PostsController(initialPosts: Posts) extends Controller {
   private val postContentForm = Form(mapping(
     "author" -> trimmedText.verifying(minLength(3)),
     "title" -> trimmedText.verifying(minLength(3)),
-    "content" -> trimmedText.verifying(minLength(3)))(PostContent.apply)(PostContent.unapply))
+    "body" -> trimmedText.verifying(minLength(3)))(PostContent.apply)(PostContent.unapply))
 }

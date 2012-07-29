@@ -21,7 +21,7 @@ object PostId {
 /**
  * Content that is always present for a blog post.
  */
-case class PostContent(author: String, title: String, content: String)
+case class PostContent(author: String, title: String, body: String)
 
 /**
  * Domain events defining the life-cycle of a blog post. Since domain events will

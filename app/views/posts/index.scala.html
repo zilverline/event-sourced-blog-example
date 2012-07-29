@@ -11,7 +11,7 @@
           <tr>
             <td>@post.content.title</td>
             <td>@post.content.author</td>
-            <td>@post.content.content.take(100)</td>
+            <td>@post.content.body.take(100)</td>
             <td>
               <form class="form-inline input-prepend" action="@routes.PostsController.delete(post.id)" method="POST">
                 <a class="btn" href="@routes.PostsController.show(post.id)">Show</a>

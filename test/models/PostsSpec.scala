@@ -9,7 +9,7 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
     val A = PostId.generate()
     val B = PostId.generate()
     val Content = PostContent("author", "title", "content")
-    val Updated = Content.copy(content = "updated")
+    val Updated = Content.copy(body = "updated")
 
     "contain post with content from last non-delete event" in {
       given event PostAdded(A, Content) thenPostWithId A must beSome(Post(A, Content))

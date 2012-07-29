@@ -24,7 +24,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     }
 
     "add post" in {
-      val result = subject.add.submit(postId)(FakeRequest().withFormUrlEncodedBody("author" -> "author", "title" -> "title", "content" -> "content"))
+      val result = subject.add.submit(postId)(FakeRequest().withFormUrlEncodedBody("author" -> "author", "title" -> "title", "body" -> "content"))
 
       status(result) must_== 303
       subject.posts() must_== Posts(Map(postId -> Post(postId, postContent)), Seq(postId))
@@ -33,7 +33,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     "edit post" in {
       subject.commit(PostAdded(postId, postContent))
 
-      val result = subject.edit.submit(postId)(FakeRequest().withFormUrlEncodedBody("author" -> "edited author", "title" -> "edited title", "content" -> "edited content"))
+      val result = subject.edit.submit(postId)(FakeRequest().withFormUrlEncodedBody("author" -> "edited author", "title" -> "edited title", "body" -> "edited content"))
 
       status(result) must_== 303
       subject.posts() must_== Posts(Map(postId -> Post(postId, PostContent("edited author", "edited title", "edited content"))), Seq(postId))
