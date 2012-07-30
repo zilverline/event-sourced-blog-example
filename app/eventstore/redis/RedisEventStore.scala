@@ -88,8 +88,9 @@ abstract class RedisEventStore[Event] protected (name: String, host: String, por
 
   // Reads and deserializes commits in `ChunkSize` chunks.
   private[this] def doReadCommits(commitIds: Seq[String]): Stream[Commit[Event]] = {
-    commitIds.grouped(ChunkSize).map(_.toArray).flatMap { ids =>
-      val serializedCommits = withJedis { _.hmget(CommitsKey, ids: _*) }
+    val chunks = commitIds.grouped(ChunkSize).map(_.toArray)
+    chunks.flatMap { chunk =>
+      val serializedCommits = withJedis { _.hmget(CommitsKey, chunk: _*) }
       serializedCommits.asScala.par.map(deserializeCommit)
     }.toStream
   }
