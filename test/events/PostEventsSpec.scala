@@ -2,6 +2,7 @@ package events
 
 import java.util.UUID
 import org.scalacheck._, Arbitrary.arbitrary, Prop.forAll
+import play.api.libs.json._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
@@ -20,11 +21,28 @@ class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.Sc
       PostId.fromString(id.toString) must beSome(id)
     }
 
+    "convert to and from JSON" in forAll { (id: PostId) =>
+      Json.fromJson[PostId](Json.toJson(id)) must_== id
+    }
+
     "fail to parse invalid strings" in forAll { (s: String) =>
       PostId.fromString(s) match {
         case Some(postId) => postId.toString must_== s
         case None         => ok
       }
+    }
+  }
+
+  "Post events" should {
+    "convert to and from JSON" in forAll(eventsForMultiplePosts.arbitrary) { events =>
+      Json.fromJson[List[PostEvent]](Json.toJson(events)) must_== events
+    }
+
+    "parse example Post Added event" in {
+      val event = PostAdded(PostId(UUID.fromString("5ab11526-477b-43b9-8fe6-4bb25a3dfcc6")), PostContent(author = "Author", title = "Title", body = "Body"))
+      val json = """{"type":"PostAdded","data":{"postId":"5ab11526-477b-43b9-8fe6-4bb25a3dfcc6","content":{"author":"Author","title":"Title","body":"Body"}}}"""
+
+      Json.fromJson[PostEvent](Json.parse(json)) must_== event
     }
   }
 }

@@ -1,5 +1,8 @@
 package eventstore
 
+import play.api.libs.json._
+import support.JsonMapping._
+
 /**
  * The revision of an event store. The revision of an event store is
  * equal to the number of commits in the event store.
@@ -19,6 +22,8 @@ final case class StoreRevision(value: Long) extends Ordered[StoreRevision] {
 object StoreRevision {
   val Initial = StoreRevision(0)
   val Maximum = StoreRevision(Long.MaxValue)
+
+  implicit val StoreRevisionFormat: Format[StoreRevision] = valueFormat(apply)(unapply)
 }
 
 /**
@@ -40,6 +45,8 @@ final case class StreamRevision(value: Long) extends Ordered[StreamRevision] {
 object StreamRevision {
   val Initial = StreamRevision(0)
   val Maximum = StreamRevision(Long.MaxValue)
+
+  implicit val StreamRevisionFormat: Format[StreamRevision] = valueFormat(apply)(unapply)
 }
 
 /**
@@ -48,11 +55,17 @@ object StreamRevision {
 case class Commit[+Event](storeRevision: StoreRevision, timestamp: Long, streamId: String, streamRevision: StreamRevision, events: Seq[Event]) {
   def eventsWithRevision: Seq[(Event, StreamRevision)] = events.map(event => (event, streamRevision))
 }
+object Commit {
+  implicit def CommitFormat[Event: Format]: Format[Commit[Event]] = objectFormat("storeRevision", "timestamp", "streamId", "streamRevision", "events")(apply[Event] _)(unapply)
+}
 
 /**
  * The conflict that occurred while trying to commit to `streamId`.
  */
 case class Conflict[+Event](streamId: String, actual: StreamRevision, expected: StreamRevision, conflicting: Seq[Commit[Event]])
+object Conflict {
+  implicit def ConflictFormat[Event: Format]: Format[Conflict[Event]] = objectFormat("streamId", "actual", "expected", "conflicting")(apply[Event] _)(unapply)
+}
 
 /**
  * Reads commits from the event store.
@@ -112,3 +125,5 @@ trait EventStore[Event] {
    */
   def close(): Unit
 }
+
+class EventStoreException(message: String, cause: Throwable) extends RuntimeException(message, cause)

@@ -25,6 +25,7 @@ import play.api.libs.concurrent.Promise
 import scala.collection.JavaConverters._
 import scala.collection.parallel.immutable.ParVector
 import eventstore.fake.FakeEventStore
+import scala.util.Random
 
 /*
  * Simple program to load test the blog posts server. Example command:
@@ -34,8 +35,6 @@ import eventstore.fake.FakeEventStore
  * Make sure you start with a clean blog posts server before running!
  */
 object PerformanceTest extends App with Instrumented {
-  running(FakeApplication()) {} // Let play initialize the logger
-
   val postContentForm = new PostsController(null).postContentForm
 
   val connMgr = new ThreadSafeClientConnManager
@@ -49,15 +48,15 @@ object PerformanceTest extends App with Instrumented {
   })
   implicit val http = httpWithRedirect
 
-  val host = args match {
-    case Array(host) => host
+  val (hosts, concurrency, iterations) = args match {
+    case Array(hosts, concurrency, iterations) => (hosts.split(","), concurrency.toInt, iterations.toInt)
     case _ =>
-      println("Please specify the base URL of the server (eg: http://localhost:9000) as the first parameter")
+      println("Please specify the base URLs of the server (eg: http://localhost:9000) as the first parameter (comma separated), concurrency level, and total number of iterations")
       sys.exit(1)
   }
 
   val random = new scala.util.Random(42)
-  def generatePosts(n: Int) = ParVector.fill(n) {
+  def generatePosts(n: Int) = Vector.fill(n) {
     def randomAsciiString(min: Int, max: Int) = {
       new String(Array.fill(random.nextInt(max - min) + min)(random.nextPrintableChar))
     }
@@ -66,7 +65,7 @@ object PerformanceTest extends App with Instrumented {
     val title = randomAsciiString(10, 90)
     val content = randomAsciiString(250, 600)
     (id -> PostContent(author, title, content))
-  }.seq
+  }
 
   println("%-10s: %8s, %8s, %8s, %8s, %8s, %8s, %8s, %8s, %8s, %8s".
     format("task", "req/s", "min (ms)", "avg (ms)", "50% (ms)", "75% (ms)", "95% (ms)", "98% (ms)", "99% (ms)", "99.9% ms", "max (ms)"))
@@ -97,28 +96,31 @@ object PerformanceTest extends App with Instrumented {
     request.setEntity(new UrlEncodedFormEntity(parameters))
   }
 
-  def showIndex(implicit timer: Timer) = timer.time {
-    execute(new HttpGet(host + routes.PostsController.index.url))
+  def randomHost(implicit random: Random) = hosts(random.nextInt(hosts.length))
+
+  def showIndex(implicit timer: Timer, random: Random) = timer.time {
+    execute(new HttpGet(randomHost + routes.PostsController.index.url))
   }
 
-  def addPost(postId: PostId, content: PostContent)(implicit timer: Timer) = timer.time {
-    val request = new HttpPost(host + routes.PostsController.add.submit(postId))
+  def addPost(postId: PostId, content: PostContent)(implicit timer: Timer, random: Random) = timer.time {
+    val request = new HttpPost(randomHost + routes.PostsController.add.submit(postId))
     contentPostParameters(request, content)
     execute(request)(httpWithoutRedirect)
   }
 
-  def readPost(postId: PostId)(implicit timer: Timer) = timer.time {
-    execute(new HttpGet(host + routes.PostsController.show(postId)))
+  def readPost(postId: PostId)(implicit timer: Timer, random: Random) = timer.time {
+    execute(new HttpGet(randomHost + routes.PostsController.show(postId)))
   }
 
-  def editPost(postId: PostId, content: PostContent)(implicit timer: Timer) = timer.time {
-    val request = new HttpPost(host + routes.PostsController.edit.submit(postId, StreamRevision(1)))
+  def editPost(postId: PostId, content: PostContent)(implicit timer: Timer, random: Random) = timer.time {
+    execute(new HttpGet(randomHost + routes.PostsController.show(postId)))
+    val request = new HttpPost(randomHost + routes.PostsController.edit.submit(postId, StreamRevision(1)))
     contentPostParameters(request, content)
     execute(request)(httpWithRedirect)
   }
 
-  def deletePost(postId: PostId)(implicit timer: Timer) = timer.time {
-    val request = new HttpPost(host + routes.PostsController.delete(postId, StreamRevision(2)))
+  def deletePost(postId: PostId)(implicit timer: Timer, random: Random) = timer.time {
+    val request = new HttpPost(randomHost + routes.PostsController.delete(postId, StreamRevision(2)))
     execute(request)(httpWithoutRedirect)
   }
 
@@ -128,21 +130,29 @@ object PerformanceTest extends App with Instrumented {
     for (i <- 0 until n) {
       executor.execute(new Runnable {
         override def run {
-          f(split(i))
+          try f(split(i)) catch {
+            case e: Exception =>
+              Console.err.println("Error: " + e)
+              e.printStackTrace
+          }
         }
       })
     }
     executor.shutdown
-    executor.awaitTermination(5, TimeUnit.MINUTES)
+    if (!executor.awaitTermination(1, TimeUnit.HOURS)) {
+      println("Timeout awaiting shutdown of executor.")
+      executor.shutdownNow
+    }
   }
 
   {
-    val Concurrency = 4
-    val Total = 10000
-    val Iterations = Total / Concurrency
+    val Concurrency = 4 * hosts.length
+    val Iterations = 5000
+    val Total = Concurrency * Iterations
     val posts = generatePosts(Total)
     withTimer("warm-up") { implicit timer =>
       runParallel(Concurrency, posts) { posts =>
+        implicit val random = new Random()
         for ((id, content) <- posts) {
           addPost(id, content)
           showIndex
@@ -155,32 +165,38 @@ object PerformanceTest extends App with Instrumented {
   }
 
   {
-    val Concurrency = 50
-    val Total = 100 * 1000
+    val Concurrency = concurrency
+    val Total = iterations
     val Iterations = Total / Concurrency
     val posts = generatePosts(Total)
     withTimer("add posts") { implicit timer =>
       runParallel(Concurrency, posts) { posts =>
+        implicit val random = new Random()
         for ((id, content) <- posts) addPost(id, content)
       }
     }
     withTimer("read posts") { implicit timer =>
       runParallel(Concurrency, posts) { posts =>
+        implicit val random = new Random()
         for ((id, content) <- posts) readPost(id)
       }
     }
     withTimer("edit posts") { implicit timer =>
       runParallel(Concurrency, posts) { posts =>
+        implicit val random = new Random()
         for ((id, content) <- posts) editPost(id, content.copy(body = content.body.reverse))
       }
     }
     withTimer("list posts") { implicit timer =>
-      runParallel(Concurrency, posts) { posts =>
+      runParallel(Concurrency, posts.take(posts.size / 4)) { posts =>
+        implicit val random = new Random()
         for ((id, content) <- posts) showIndex
       }
     }
   }
 
+
+  connMgr.shutdown
   println("Done.")
   System.exit(0)
 }

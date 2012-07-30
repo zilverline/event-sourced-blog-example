@@ -4,6 +4,7 @@ import java.util.UUID
 import java.util.concurrent.{ CountDownLatch, TimeUnit }
 import org.joda.time.DateTimeUtils
 import org.scalacheck._, Arbitrary.arbitrary, Prop.{ forAll, forAllNoShrink }
+import play.api.libs.json._
 
 object EventStoreSpec {
   private[this] implicit def arbitrarySeq[A: Arbitrary]: Arbitrary[Seq[A]] = Arbitrary(arbitrary[List[A]])
@@ -52,6 +53,10 @@ class StoreRevisionSpec extends org.specs2.mutable.Specification with org.specs2
     "support ordering - totality" in forAll { (a: StoreRevision, b: StoreRevision) =>
       a <= b || b <= a
     }
+
+    "support JSON serialization" in forAll { (a: StoreRevision) =>
+      Json.fromJson[StoreRevision](Json.toJson(a)) must_== a
+    }
   }
 }
 
@@ -91,16 +96,42 @@ class StreamRevisionSpec extends org.specs2.mutable.Specification with org.specs
     "support ordering - totality" in forAll { (a: StreamRevision, b: StreamRevision) =>
       a <= b || b <= a
     }
+
+    "support JSON serialization" in forAll { (a: StreamRevision) =>
+      Json.fromJson[StreamRevision](Json.toJson(a)) must_== a
+    }
   }
 }
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class CommitSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
-  val ExampleCommit = Commit(StoreRevision(1), DateTimeUtils.currentTimeMillis, "StreamId", StreamRevision(2), Seq("Event1", "Event2"))
+class ConflictAndCommitSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
+  val SerializedCommit = """{"storeRevision":5,"timestamp":1342542931694,"streamId":"StreamId","streamRevision":2,"events":["Event1","Event2"]}"""
+  val ExampleCommit = Commit(StoreRevision(5), 1342542931694L, "StreamId", StreamRevision(2), Seq("Event1", "Event2"))
+
+  val SerializedConflict = """{"streamId":"StreamId","actual":2,"expected":1,"conflicting":[%s]}""".format(SerializedCommit)
+  val ExampleConflict = Conflict("StreamId", actual = StreamRevision(2), expected = StreamRevision(1), conflicting = Seq(ExampleCommit))
 
   "Commits" should {
+    "deserialize example JSON" in {
+      Json.fromJson[Commit[String]](Json.parse(SerializedCommit)) must_== ExampleCommit
+    }
+
+    "be serializable to and from JSON" in forAll { (commit: Commit[String]) =>
+      Json.fromJson[Commit[String]](Json.toJson(commit)) must_== commit
+    }
+
     "combine event with stream revision" in {
       ExampleCommit.eventsWithRevision must_== Seq(("Event1", StreamRevision(2)), ("Event2", StreamRevision(2)))
+    }
+  }
+
+  "Conflicts" should {
+    "deserialize example JSON" in {
+      Json.fromJson[Conflict[String]](Json.parse(SerializedConflict)) must_== ExampleConflict
+    }
+
+    "be serializable to and from JSON" in forAll { (conflict: Conflict[String]) =>
+      Json.fromJson[Conflict[String]](Json.toJson(conflict)) must_== conflict
     }
   }
 }

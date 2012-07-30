@@ -1,7 +1,7 @@
 package models
 
 import events._
-import eventstore.StreamRevision
+import eventstore._
 
 /**
  * A specific blog post with its current revision and content.
@@ -21,7 +21,7 @@ case class Posts(byId: Map[PostId, Post] = Map.empty, orderedByTimeAdded: Seq[Po
     case PostEdited(id, content) =>
       this.copy(byId = byId.updated(id, byId(id).copy(revision = revision, content = content)))
     case PostDeleted(id) =>
-      this.copy(byId = byId - id, orderedByTimeAdded = orderedByTimeAdded.filterNot(_ == id))
+      this.copy(byId = byId - id, orderedByTimeAdded = orderedByTimeAdded.par.filterNot(_ == id).seq)
   }
 
   def updateMany(events: Seq[(PostEvent, StreamRevision)]): Posts = events.foldLeft(this) { (posts, event) =>

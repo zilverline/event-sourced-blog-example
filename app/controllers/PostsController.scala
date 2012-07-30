@@ -8,14 +8,11 @@ import play.api.mvc._
 import play.api.data._
 import play.api.data.Forms._
 import play.api.data.validation.Constraints._
-import play.api.Play.current
 import support.Mappings._
-import scala.concurrent.stm._
 import views.html.defaultpages.{ notFound, todo }
 
-object PostsController extends PostsController(MemoryImage[Posts, PostEvent](new fake.FakeEventStore)(Posts()) {
-  (posts, commit) => posts.updateMany(commit.eventsWithRevision)
-})
+
+object PostsController extends PostsController(Global.persistence.memoryImage)
 class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Controller {
   /**
    * The current blog posts from the memory image.
