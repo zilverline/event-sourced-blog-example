@@ -4,6 +4,7 @@ import org.scalacheck._, Arbitrary.arbitrary, Prop.{ forAll, forAllNoShrink }
 import events._, PostEventsSpec._
 import eventstore._
 import eventstore.fake.FakeEventStore
+import scala.collection.immutable.SortedMap
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
@@ -20,10 +21,11 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
 
       forAllNoShrink(arbitrary(eventsForSinglePost(A))) { events =>
         val posts = given.events(events: _*).posts
-        events.last match {
+        events.filterNot(_.isInstanceOf[PostCommentEvent]).last match {
           case PostAdded(id, content)  => posts.get(id).map(_.content) must beSome(content)
           case PostEdited(id, content) => posts.get(id).map(_.content) must beSome(content)
           case PostDeleted(id)         => posts.get(id) must beNone
+          case _                       => failure("unknown event")
         }
       }
     }
@@ -40,6 +42,24 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
         val remainingIds = events.collect { case PostAdded(id, _) => id }.filterNot(deletedIds)
 
         posts.mostRecent(Int.MaxValue) must_== remainingIds.flatMap(posts.get).reverse
+      }
+    }
+
+    val CommentContent_1 = CommentContent("Commenter", "Body 1")
+    "track comments and the next comment id" in {
+      given events (PostAdded(A, Content), CommentAdded(A, CommentId(1), CommentContent_1)) thenPostWithId A must beSome(Post(A, StreamRevision(2), Content, CommentId(2), SortedMap(CommentId(1) -> CommentContent_1)))
+      given events (PostAdded(A, Content), CommentAdded(A, CommentId(1), CommentContent_1), CommentDeleted(A, CommentId(1))) thenPostWithId A must beSome(Post(A, StreamRevision(3), Content, CommentId(2), SortedMap.empty))
+
+      forAllNoShrink(arbitrary(eventsForSinglePost(A))) { events =>
+        !events.last.isInstanceOf[PostDeleted] ==> {
+          val post = given.events(events: _*).posts.get(A).getOrElse(failure("post not found"))
+          val commentsAdded = events.collect { case e: CommentAdded => e }
+          val commentsDeleted = events.collect { case e: CommentDeleted => e }.map(_.commentId).toSet
+          val remaining = commentsAdded.filterNot(e => commentsDeleted.contains(e.commentId)).map(e => (e.commentId, e.content)).toMap
+
+          post.nextCommentId must_== CommentId(commentsAdded.size + 1)
+          remaining must_== post.comments
+        }
       }
     }
   }

@@ -2,17 +2,26 @@ package support
 
 import java.net.URLDecoder
 import java.util.UUID
-import events.PostId
+import events.CommentId
 import eventstore.{ StoreRevision, StreamRevision }
 
 object Binders {
-  implicit object pathBindablePostId extends play.api.mvc.PathBindable[PostId] {
+  implicit def IdentifierPathBindable[A <: Identifier](implicit companion: IdentifierCompanion[A]) = new play.api.mvc.PathBindable[A] {
     override def bind(key: String, value: String) = try {
-      Right(PostId(UUID.fromString(URLDecoder.decode(value, "utf-8"))))
+      Right(companion.apply(UUID.fromString(URLDecoder.decode(value, "utf-8"))))
     } catch {
-      case _: RuntimeException => Left("Cannot parse parameter " + key + " as PostId: " + URLDecoder.decode(value, "utf-8"))
+      case _: RuntimeException => Left("Cannot parse parameter " + key + " as " + companion.prefix + ": " + URLDecoder.decode(value, "utf-8"))
     }
-    override def unbind(key: String, value: PostId) = value.uuid.toString
+    override def unbind(key: String, value: A) = value.uuid.toString
+  }
+
+  implicit object CommentIdBindable extends play.api.mvc.PathBindable[CommentId] {
+    override def bind(key: String, value: String) = try {
+      Right(CommentId(URLDecoder.decode(value, "utf-8").toInt))
+    } catch {
+      case _: RuntimeException => Left("Cannot parse parameter " + key + " as CommentId: " + URLDecoder.decode(value, "utf-8"))
+    }
+    override def unbind(key: String, value: CommentId) = value.value.toString
   }
 
   implicit object queryStringBindableStoreRevision extends play.api.mvc.QueryStringBindable[StoreRevision] {
@@ -25,11 +34,8 @@ object Binders {
     }
     override def unbind(key: String, value: StoreRevision) = key + "=" + value.value
   }
-  implicit def litteralStoreRevision = new play.api.mvc.JavascriptLitteral[StoreRevision] {
-    def to(value: StoreRevision) = value.value.toString
-  }
 
-  implicit object queryStringindableStreamRevision extends play.api.mvc.QueryStringBindable[StreamRevision] {
+  implicit object queryStringBindableStreamRevision extends play.api.mvc.QueryStringBindable[StreamRevision] {
     override def bind(key: String, params: Map[String, Seq[String]]) = params.get(key).flatMap(_.headOption).map { value =>
       try {
         Right(StreamRevision(value.toLong))

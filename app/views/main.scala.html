@@ -21,11 +21,13 @@
                 </div>
             </div>
         </div>
-        <section class="container">
-        <h1>@title</h1>
+        <div class="container">
         @flash()
+        <div class="page-header">
+        <h1>@title</h1>
+        </div>
         @content
-        </section>
+        </div>
         <script>
         $(function() {
           $(".alert").alert();

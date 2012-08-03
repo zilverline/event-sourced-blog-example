@@ -13,7 +13,7 @@ object ApplicationBuild extends Build {
     "org.scalacheck" %% "scalacheck" % "1.9" % "test")
 
   val main = PlayProject(appName, appVersion, appDependencies, mainLang = SCALA).settings(
-    routesImport ++= Seq("events.PostId", "eventstore.{ StoreRevision, StreamRevision }", "support.Binders._"),
+    routesImport ++= Seq("events._", "eventstore.{ StoreRevision, StreamRevision }", "support.Binders._"),
 
     templatesImport ++= Seq("events._", "eventstore.{ StoreRevision, StreamRevision }"),
 

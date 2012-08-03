@@ -14,5 +14,8 @@ POST    /posts/:id/edit             controllers.PostsController.edit.submit(id: 
 POST    /posts/:id/delete           controllers.PostsController.delete(id: PostId, r: StreamRevision)
 GET     /posts/:id                  controllers.PostsController.show(id: PostId)
 
+POST    /posts/:postId/comments/                   controllers.PostsController.comments.add(postId: PostId, r: StreamRevision)
+POST    /posts/:postId/comments/:commentId/delete  controllers.PostsController.comments.delete(postId: PostId, r: StreamRevision, commentId: CommentId)
+
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)

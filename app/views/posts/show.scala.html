@@ -1,9 +1,41 @@
-@(post: Post)(implicit request: RequestHeader)
+@(post: Post, form: Form[CommentContent], conflicts: Seq[PostEvent] = Nil)(implicit request: RequestHeader)
+@import helper.twitterBootstrap._
 
-@main("Post: " + post.content.title) {
-  <p>@post.content.body -- <em>by @post.content.author</em></p>
-  <p>
-    <a class="btn" href="@routes.PostsController.edit.show(post.id)">Edit...</a>
-    <a class="btn" href="@routes.PostsController.index()">Back</a>
-  </p>
+@main(post.content.title) {
+  <div class="well">
+    <p>@post.content.body -- <em>by @post.content.author</em></p>
+    <div class="btn-group">
+      <a class="btn" href="@routes.PostsController.edit.show(post.id)">Edit...</a>
+      <a class="btn" href="@routes.PostsController.index()">Back</a>
+    </div>
+  </div>
+
+  @if(post.comments.nonEmpty) {
+    <h2>Comments</h2>
+    @for((commentId, commentContent) <- post.comments) {
+      <br/>
+      <div style="display: inline-block;">
+        <form class="form-inline" style="display: inline-block;" action="@routes.PostsController.comments.delete(post.id, post.revision, commentId)" method="POST">
+          <fieldset><button>&times;</button></fieldset>
+        </form>
+        &nbsp; @commentContent.body -- <em>by @commentContent.commenter</em>
+      </div>
+    }
+  }
+
+  <br/>
+  <h2>Add a comment:</h2>
+
+  @helper.form(action = routes.PostsController.comments.add(post.id, post.revision)) {
+    @globalErrorsPanel(form)
+    @conflictsMessagePanel(conflicts)
+    <fieldset>
+      @helper.inputText(form("commenter"), '_label -> "Commenter", 'required -> "required")
+      @helper.textarea(form("body"), '_label -> "Body", 'cols -> 80, 'rows -> 10)
+    </fieldset>
+
+    <fieldset>
+      <button class="btn btn-primary">Submit</button>
+    </fieldset>
+  }
 }

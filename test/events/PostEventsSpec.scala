@@ -51,14 +51,37 @@ object PostEventsSpec {
   implicit val arbitraryPostId: Arbitrary[PostId] = Arbitrary(Gen.wrap(PostId.generate()))
 
   implicit val arbitraryPostContent: Arbitrary[PostContent] = Arbitrary(Gen.resultOf(PostContent.apply _))
+  implicit val arbitraryCommentContent: Arbitrary[CommentContent] = Arbitrary(Gen.resultOf(CommentContent.apply _))
 
   def eventsForSinglePost(id: PostId): Arbitrary[List[PostEvent]] = Arbitrary(for {
     added <- Gen.resultOf(PostAdded(id, _: PostContent))
-    edits <- Gen.listOf(Gen.resultOf(PostEdited(id, _: PostContent)))
+    edits <- Gen.resize(10, Gen.listOf(Gen.resultOf(PostEdited(id, _: PostContent))))
+    commentCount <- Gen.chooseNum(0, 5)
+    comments <- Gen.sequence[List, List[PostCommentEvent]](List.tabulate(commentCount) { i =>
+      val commentId = CommentId(i + 1)
+      for {
+        added <- Gen.resultOf(CommentAdded(id, commentId, _: CommentContent))
+        deleted <- Gen.frequency(3 -> Nil, 1 -> List(CommentDeleted(id, commentId)))
+      } yield {
+        added :: deleted
+      }
+    }).map(_.flatten)
+    e <- interleave(edits, comments)
     deleted <- Gen.frequency(3 -> Nil, 1 -> List(PostDeleted(id)))
-  } yield added :: edits ::: deleted)
+  } yield added :: e ::: deleted)
 
   val eventsForMultiplePosts: Arbitrary[List[PostEvent]] = Arbitrary(for {
     events <- Gen.resize(10, Gen.listOf(arbitrary[PostId].flatMap { id => Gen.resize(5, arbitrary(eventsForSinglePost(id))) }))
   } yield events.flatten)
+
+  private[this] def interleave[T](a: List[T], b: List[T]): Gen[List[T]] = {
+    if (a.isEmpty) Gen.value(b)
+    else if (b.isEmpty) Gen.value(a)
+    else for {
+      (first, second) <- Gen.oneOf(Seq((a, b), (b, a)))
+      rest <- interleave(first.tail, second)
+    } yield {
+      first.head :: rest
+    }
+  }
 }

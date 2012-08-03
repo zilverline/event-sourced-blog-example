@@ -1,0 +1,12 @@
+@(form: Form[_])
+
+@if(form.hasGlobalErrors) {
+  <div class="alert alert-error">
+    <p>Please resolve the following errors</p>
+    <ul>
+      @for(error <- form.globalErrors) {
+        <li>@error.message</li>
+      }
+    </ul>
+  </div>
+}

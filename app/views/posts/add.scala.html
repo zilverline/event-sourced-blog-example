@@ -1,5 +1,5 @@
 @(id: PostId, form: Form[PostContent])(implicit request: RequestHeader)
 
 @main("New blog post") {
-  @contentForm(label = "Add", action = routes.PostsController.add.submit(id), form = form)
+  @postContentForm(label = "Add", action = routes.PostsController.add.submit(id), form = form)
 }

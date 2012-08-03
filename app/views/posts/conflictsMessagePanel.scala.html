@@ -1,0 +1,20 @@
+@(conflicts: Seq[PostEvent] = Nil)
+
+@if(conflicts.nonEmpty) {
+  <div class="alert">
+    <p>The following conflicts occurred. Please review your changes and resubmit if still applicable.</p>
+    <ul>
+      @for(conflict <- conflicts) {
+        <li>
+        @conflict match {
+          case _: PostAdded => { The post was added. }
+          case event: PostEdited => { The post was edited by @event.content.author. }
+          case _: PostDeleted => { The post was deleted. }
+          case event: CommentAdded => { A comment was added by @event.content.commenter. }
+          case _: CommentDeleted => { A comment was deleted. }
+        }
+        </li>
+      }
+    </ul>
+  </div>
+}

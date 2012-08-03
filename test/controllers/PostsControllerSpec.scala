@@ -6,6 +6,7 @@ import events._
 import eventstore._
 import models._
 import org.specs2.mutable.After
+import scala.collection.immutable.SortedMap
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PostsControllerSpec extends org.specs2.mutable.Specification {
@@ -48,6 +49,25 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
       header("Location", result) must beSome("/posts/")
       subject.posts().byId must beEmpty
       subject.posts().orderedByTimeAdded must beEmpty
+    }
+
+    "add comment to post" in new fixture {
+      memoryImage.tryCommit(postId.toString, StreamRevision.Initial, PostAdded(postId, postContent))
+
+      val result = subject.comments.add(postId, StreamRevision(1))(FakeRequest().withFormUrlEncodedBody("commenter" -> "Commenter", "body" -> "Body"))
+
+      status(result) must_== 303
+      subject.posts().get(postId).map(_.comments) must beSome(SortedMap(CommentId(1) -> CommentContent("Commenter", "Body")))
+    }
+
+    "delete comment from post" in new fixture {
+      memoryImage.tryCommit(postId.toString, StreamRevision(0), PostAdded(postId, postContent))
+      memoryImage.tryCommit(postId.toString, StreamRevision(1), CommentAdded(postId, CommentId(1), CommentContent("Commenter", "Body")))
+
+      val result = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(FakeRequest())
+
+      status(result) must_== 303
+      subject.posts().get(postId).map(_.comments.get(CommentId(1))) must beSome(None)
     }
   }
 
