@@ -3,6 +3,17 @@ package eventstore
 import scala.concurrent.stm._
 import scala.annotation.tailrec
 
+sealed trait Transaction[+Event, +A]
+private case class TransactionAbort[A](onAbort: () => A) extends Transaction[Nothing, A]
+private case class TransactionCommit[Event, A](event: Event, onCommit: () => A, onConflict: (StreamRevision, Seq[Event]) => A, conflictResolver: ConflictResolver[Event]) extends Transaction[Event, A]
+
+object Transaction {
+  def commit[Event, A](event: Event)(onCommit: => A, onConflict: (StreamRevision, Seq[Event]) => A)(implicit resolver: ConflictResolver[Event]): Transaction[Event, A] =
+    TransactionCommit(event, () => onCommit, onConflict, resolver)
+
+  def abort[A](value: => A): Transaction[Nothing, A] = TransactionAbort(() => value)
+}
+
 /**
  * Factory methods for a `MemoryImage`
  */
@@ -31,17 +42,34 @@ class MemoryImage[State, Event] private (eventStore: EventStore[Event])(initialS
    * conflict is detected, so the provided `body` must be side-effect free.
    */
   def modify[A](streamId: String, expected: StreamRevision)(body: State => Transaction[Event, A]): A = {
-    @tailrec def loop(minimum: StoreRevision): A = {
+    @tailrec def runTransaction(minimum: StoreRevision): A = {
       val (transactionRevision, state) = get(minimum)
-      val context = TransactionContext(transactionRevision, streamId, expected)
-
-      body(state).run(context, eventStore.committer) match {
-        case Left(lastModifiedRevision) => loop(lastModifiedRevision)
-        case Right(a)                   => a
+      body(state) match {
+        case TransactionAbort(onAbort) =>
+          onAbort()
+        case TransactionCommit(event, onCommit, onConflict, resolver) =>
+          eventStore.committer.tryCommit(streamId, expected, event) match {
+            case Right(commit) =>
+              onCommit()
+            case Left(conflict) =>
+              if (transactionRevision < conflict.lastModifiedRevision) {
+                runTransaction(conflict.lastModifiedRevision)
+              } else {
+                val conflicts = conflict.events.filter(resolver(event))
+                if (conflicts.nonEmpty) {
+                  onConflict(conflict.actual, conflicts)
+                } else {
+                  eventStore.committer.tryCommit(streamId, conflict.actual, event) match {
+                    case Right(commit)  => onCommit()
+                    case Left(conflict) => runTransaction(conflict.conflicting.last.storeRevision)
+                  }
+                }
+              }
+          }
       }
     }
 
-    loop(eventStore.reader.storeRevision)
+    runTransaction(eventStore.reader.storeRevision)
   }
 
   override def toString = "MemoryImage(%s, %s)".format(revision.single.get, eventStore)

@@ -13,7 +13,12 @@ object EventStoreSpec {
   implicit def arbitraryStreamRevision: Arbitrary[StreamRevision] = Arbitrary(Gen.chooseNum(StreamRevision.Initial.value, StreamRevision.Maximum.value).map(StreamRevision.apply))
 
   implicit def arbitraryCommit[Event: Arbitrary]: Arbitrary[Commit[Event]] = Arbitrary(Gen.resultOf(Commit.apply[Event] _))
-  implicit def arbitraryConflict[Event: Arbitrary]: Arbitrary[Conflict[Event]] = Arbitrary(Gen.resultOf(Conflict.apply[Event] _))
+  implicit def arbitraryConflict[Event: Arbitrary]: Arbitrary[Conflict[Event]] = Arbitrary(for {
+    actual <- arbitrary[StreamRevision]
+    expected <- arbitrary[StreamRevision].suchThat(_ < actual)
+    conflicting <- Gen.resize(10, arbitrary[List[Commit[Event]]].suchThat(_.nonEmpty))
+    streamId <- arbitrary[String]
+  } yield Conflict(streamId, actual, expected, conflicting))
 }
 import EventStoreSpec._
 

@@ -77,7 +77,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
       postContentForm.bindFromRequest.fold(
         formWithErrors => BadRequest(views.html.posts.add(id, formWithErrors)),
         postContent => createPost(id) {
-          Transaction.commit(PostAdded(id, postContent): PostEvent)(
+          Transaction.commit(PostAdded(id, postContent))(
             onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post added."),
             onConflict = (actual, conflicts) => Conflict(views.html.posts.edit(id, actual, postContentForm.fill(postContent), conflicts)))
         })
@@ -99,7 +99,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
         postContentForm.bindFromRequest.fold(
           formWithErrors => Transaction.abort(BadRequest(views.html.posts.edit(id, expected, formWithErrors))),
           postContent =>
-            Transaction.commit(PostEdited(id, postContent): PostEvent)(
+            Transaction.commit(PostEdited(id, postContent))(
               onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post saved."),
               onConflict = (actual, conflicts) => Conflict(views.html.posts.edit(id, actual, postContentForm.fill(postContent), conflicts))))
       }
@@ -112,7 +112,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
   def delete(id: PostId, expected: StreamRevision) = Action { implicit request =>
     def deletedResult = Redirect(routes.PostsController.index).flashing("info" -> "Post deleted.")
     updatePost(id, expected, notFound = _ => deletedResult) { post =>
-      Transaction.commit(PostDeleted(id): PostEvent)(
+      Transaction.commit(PostDeleted(id))(
         onCommit = deletedResult,
         onConflict = (actual, conflicts) => Conflict(views.html.posts.index(posts().mostRecent(20), conflicts)))
     }
@@ -131,7 +131,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
         commentContentForm.bindFromRequest.fold(
           formWithErrors => Transaction.abort(BadRequest(views.html.posts.show(post, formWithErrors))),
           commentContent =>
-            Transaction.commit(CommentAdded(postId, post.nextCommentId, commentContent): PostEvent)(
+            Transaction.commit(CommentAdded(postId, post.nextCommentId, commentContent))(
               onCommit = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment added."),
               onConflict = (actual, conflicts) => Conflict(views.html.posts.show(post, commentContentForm.fill(commentContent), conflicts))))
       }
@@ -143,7 +143,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
         post.comments.get(commentId) match {
           case None => Transaction.abort(deletedResult)
           case Some(comment) =>
-            Transaction.commit(CommentDeleted(postId, commentId): PostEvent)(
+            Transaction.commit(CommentDeleted(postId, commentId))(
               onCommit = deletedResult,
               onConflict = (actual, conflicts) => Conflict(views.html.posts.show(post, commentContentForm, conflicts)))
         }

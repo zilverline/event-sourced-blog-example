@@ -62,7 +62,13 @@ object Commit {
 /**
  * The conflict that occurred while trying to commit to `streamId`.
  */
-case class Conflict[+Event](streamId: String, actual: StreamRevision, expected: StreamRevision, conflicting: Seq[Commit[Event]])
+case class Conflict[+Event](streamId: String, actual: StreamRevision, expected: StreamRevision, conflicting: Seq[Commit[Event]]) {
+  require(actual > expected, "actual > expected")
+  require(conflicting.nonEmpty, "conflicting.nonEmpty")
+
+  def events: Seq[Event] = conflicting.flatMap(_.events)
+  def lastModifiedRevision: StoreRevision = conflicting.last.storeRevision
+}
 object Conflict {
   implicit def ConflictFormat[Event: Format]: Format[Conflict[Event]] = objectFormat("streamId", "actual", "expected", "conflicting")(apply[Event] _)(unapply)
 }
