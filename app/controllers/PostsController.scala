@@ -18,34 +18,36 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
    */
   def posts(): Posts = memoryImage.get
 
-  /**
-   * Commits an event and applies it to the current state. If successful the
-   * provided `onCommit` callback is invoked and its result returned. Otherwise
-   * the `onConflict` is callback is invoked and its result returned.
-   */
-  private[this] def commit(expected: StreamRevision, event: PostEvent)(onCommit: => Result, onConflict: (StreamRevision, Seq[PostEvent]) => Result): Result = {
-    def resolveConflict(committed: Seq[PostEvent], attempted: PostEvent): Either[Seq[PostEvent], PostEvent] = {
-      val conflicting = committed.filter(PostEvent.conflictsWith(_, attempted))
-      if (conflicting.isEmpty) Right(attempted)
-      else Left(conflicting)
-    }
+  implicit def reader = (posts: Posts, id: PostId) => posts.get(id).map(p => (p.revision, p))
 
-    @tailrec def run(expected: StreamRevision, event: PostEvent): Result = memoryImage.tryCommit(event.postId.toString, expected, event) match {
-      case Right(commit) => onCommit
-      case Left(conflict) => resolveConflict(conflict.conflicting.flatMap(_.events), event) match {
-        case Right(event)      => run(conflict.actual, event)
-        case Left(conflicting) => onConflict(conflict.actual, conflicting)
-      }
-    }
-
-    run(expected, event)
-  }
+  implicit val PostEventConflictResolver = ConflictResolver(PostEvent.conflictsWith)
 
   private[this] def notFound(request: Request[_]) = NotFound(views.html.defaultpages.notFound(request, None))
 
   private[this] def withPost(postId: PostId, notFound: Request[_] => Result = notFound)(found: Post => Result)(implicit request: Request[_]) = {
     posts().get(postId).map(found).getOrElse(notFound(request))
   }
+
+  private[this] def createPost(postId: PostId)(body: => Transaction[PostEvent, Result])(implicit request: Request[_]): Result = {
+    memoryImage.modify(postId, StreamRevision.Initial) apply { _ => body }
+  }
+
+  private[this] def updatePost(postId: PostId, expected: StreamRevision, notFound: Request[_] => Result = notFound)(body: Post => Transaction[PostEvent, Result])(implicit request: Request[_]): Result = {
+    memoryImage.modify(postId, expected) apply { post =>
+      post match {
+        case None       => Transaction.abort(notFound(request))
+        case Some(post) => body(post)
+      }
+    }
+  }
+
+  /*
+   * Blog content form definition.
+   */
+  val postContentForm = Form(mapping(
+    "author" -> trimmedText.verifying(minLength(3)),
+    "title" -> trimmedText.verifying(minLength(3)),
+    "body" -> trimmedText.verifying(minLength(3)))(PostContent.apply)(PostContent.unapply))
 
   /**
    * Show an overview of the most recent blog posts.
@@ -74,10 +76,11 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
     def submit(id: PostId) = Action { implicit request =>
       postContentForm.bindFromRequest.fold(
         formWithErrors => BadRequest(views.html.posts.add(id, formWithErrors)),
-        postContent =>
-          commit(StreamRevision.Initial, PostAdded(id, postContent))(
+        postContent => createPost(id) {
+          Transaction.commit(PostAdded(id, postContent): PostEvent)(
             onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post added."),
-            onConflict = (actual, conflicts) => Conflict(views.html.posts.edit(id, actual, postContentForm.fill(postContent), conflicts))))
+            onConflict = (actual, conflicts) => Conflict(views.html.posts.edit(id, actual, postContentForm.fill(postContent), conflicts)))
+        })
     }
   }
 
@@ -92,11 +95,11 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
     }
 
     def submit(id: PostId, expected: StreamRevision) = Action { implicit request =>
-      withPost(id) { post =>
+      updatePost(id, expected) { post =>
         postContentForm.bindFromRequest.fold(
-          formWithErrors => BadRequest(views.html.posts.edit(id, expected, formWithErrors)),
+          formWithErrors => Transaction.abort(BadRequest(views.html.posts.edit(id, expected, formWithErrors))),
           postContent =>
-            commit(expected, PostEdited(id, postContent))(
+            Transaction.commit(PostEdited(id, postContent): PostEvent)(
               onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post saved."),
               onConflict = (actual, conflicts) => Conflict(views.html.posts.edit(id, actual, postContentForm.fill(postContent), conflicts))))
       }
@@ -108,8 +111,8 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
    */
   def delete(id: PostId, expected: StreamRevision) = Action { implicit request =>
     def deletedResult = Redirect(routes.PostsController.index).flashing("info" -> "Post deleted.")
-    withPost(id, notFound = _ => deletedResult) { post =>
-      commit(expected, PostDeleted(id))(
+    updatePost(id, expected, notFound = _ => deletedResult) { post =>
+      Transaction.commit(PostDeleted(id): PostEvent)(
         onCommit = deletedResult,
         onConflict = (actual, conflicts) => Conflict(views.html.posts.index(posts().mostRecent(20), conflicts)))
     }
@@ -124,35 +127,27 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
       "body" -> trimmedText.verifying(minLength(3)))(CommentContent.apply)(CommentContent.unapply))
 
     def add(postId: PostId, expected: StreamRevision) = Action { implicit request =>
-      withPost(postId) { post =>
+      updatePost(postId, expected) { post =>
         commentContentForm.bindFromRequest.fold(
-          formWithErrors => BadRequest(views.html.posts.show(post, formWithErrors)),
+          formWithErrors => Transaction.abort(BadRequest(views.html.posts.show(post, formWithErrors))),
           commentContent =>
-            commit(expected, CommentAdded(postId, post.nextCommentId, commentContent))(
+            Transaction.commit(CommentAdded(postId, post.nextCommentId, commentContent): PostEvent)(
               onCommit = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment added."),
               onConflict = (actual, conflicts) => Conflict(views.html.posts.show(post, commentContentForm.fill(commentContent), conflicts))))
       }
     }
 
     def delete(postId: PostId, expected: StreamRevision, commentId: CommentId) = Action { implicit request =>
-      withPost(postId) { post =>
+      updatePost(postId, expected) { post =>
         def deletedResult = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment deleted.")
         post.comments.get(commentId) match {
-          case None => deletedResult
+          case None => Transaction.abort(deletedResult)
           case Some(comment) =>
-            commit(expected, CommentDeleted(postId, commentId))(
+            Transaction.commit(CommentDeleted(postId, commentId): PostEvent)(
               onCommit = deletedResult,
               onConflict = (actual, conflicts) => Conflict(views.html.posts.show(post, commentContentForm, conflicts)))
         }
       }
     }
   }
-
-  /*
-   * Blog content form definition.
-   */
-  val postContentForm = Form(mapping(
-    "author" -> trimmedText.verifying(minLength(3)),
-    "title" -> trimmedText.verifying(minLength(3)),
-    "body" -> trimmedText.verifying(minLength(3)))(PostContent.apply)(PostContent.unapply))
 }
