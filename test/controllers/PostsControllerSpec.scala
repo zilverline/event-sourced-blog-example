@@ -15,7 +15,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
 
   "posts controller" should {
     "list posts" in new fixture {
-      memoryImage.tryCommit(postId.toString, StreamRevision.Initial, PostAdded(postId, postContent)) must beRight
+      eventStore.committer.tryCommit(postId.toString, StreamRevision.Initial, PostAdded(postId, postContent)) must beRight
 
       val result = subject.index(FakeRequest())
 
@@ -32,7 +32,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     }
 
     "edit post" in new fixture {
-      memoryImage.tryCommit(postId.toString, StreamRevision.Initial, PostAdded(postId, postContent))
+      eventStore.committer.tryCommit(postId.toString, StreamRevision.Initial, PostAdded(postId, postContent))
 
       val result = subject.edit.submit(postId, StreamRevision(1))(FakeRequest().withFormUrlEncodedBody("author" -> "edited author", "title" -> "edited title", "body" -> "edited body"))
 
@@ -41,7 +41,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     }
 
     "delete post" in new fixture {
-      memoryImage.tryCommit(postId.toString, StreamRevision.Initial, PostAdded(postId, postContent))
+      eventStore.committer.tryCommit(postId.toString, StreamRevision.Initial, PostAdded(postId, postContent))
 
       val result = subject.delete(postId, StreamRevision(1))(FakeRequest())
 
@@ -52,7 +52,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     }
 
     "add comment to post" in new fixture {
-      memoryImage.tryCommit(postId.toString, StreamRevision.Initial, PostAdded(postId, postContent))
+      eventStore.committer.tryCommit(postId.toString, StreamRevision.Initial, PostAdded(postId, postContent))
 
       val result = subject.comments.add(postId, StreamRevision(1))(FakeRequest().withFormUrlEncodedBody("commenter" -> "Commenter", "body" -> "Body"))
 
@@ -61,8 +61,8 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     }
 
     "delete comment from post" in new fixture {
-      memoryImage.tryCommit(postId.toString, StreamRevision(0), PostAdded(postId, postContent))
-      memoryImage.tryCommit(postId.toString, StreamRevision(1), CommentAdded(postId, CommentId(1), CommentContent("Commenter", "Body")))
+      eventStore.committer.tryCommit(postId.toString, StreamRevision(0), PostAdded(postId, postContent))
+      eventStore.committer.tryCommit(postId.toString, StreamRevision(1), CommentAdded(postId, CommentId(1), CommentContent("Commenter", "Body")))
 
       val result = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(FakeRequest())
 

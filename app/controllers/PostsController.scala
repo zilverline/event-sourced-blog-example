@@ -18,7 +18,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
    */
   def posts(): Posts = memoryImage.get
 
-  implicit def reader = (posts: Posts, id: PostId) => posts.get(id).map(p => (p.revision, p))
+  implicit def reader = (posts: Posts, id: PostId) => posts.get(id)
 
   implicit val PostEventConflictResolver = ConflictResolver(PostEvent.conflictsWith)
 
@@ -29,12 +29,12 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
   }
 
   private[this] def createPost(postId: PostId)(body: => Transaction[PostEvent, Result])(implicit request: Request[_]): Result = {
-    memoryImage.modify(postId, StreamRevision.Initial) apply { _ => body }
+    memoryImage.modify(postId.toString, StreamRevision.Initial) { _ => body }
   }
 
   private[this] def updatePost(postId: PostId, expected: StreamRevision, notFound: Request[_] => Result = notFound)(body: Post => Transaction[PostEvent, Result])(implicit request: Request[_]): Result = {
-    memoryImage.modify(postId, expected) apply { post =>
-      post match {
+    memoryImage.modify(postId.toString, expected) { posts =>
+      posts.get(postId) match {
         case None       => Transaction.abort(notFound(request))
         case Some(post) => body(post)
       }
