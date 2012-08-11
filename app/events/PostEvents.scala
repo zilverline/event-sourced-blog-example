@@ -2,6 +2,8 @@ package events
 
 import java.util.UUID
 import play.api.libs.json._
+import support.ConflictResolver
+import support.EventDescriptor
 import support.Identifier
 import support.IdentifierCompanion
 import support.JsonMapping._
@@ -42,6 +44,14 @@ case class CommentAdded(postId: PostId, commentId: CommentId, content: CommentCo
 case class CommentDeleted(postId: PostId, commentId: CommentId) extends PostCommentEvent
 
 object PostEvent {
+  implicit val PostEventDescriptor: EventDescriptor[PostEvent] = EventDescriptor(_.postId)
+
+  implicit val PostEventConflictResolver: ConflictResolver[PostEvent] = ConflictResolver {
+    case (a: PostCommentEvent, b: PostCommentEvent) => a.commentId == b.commentId
+    case (_: PostCommentEvent, _)                   => false
+    case _                                          => true
+  }
+
   implicit val PostContentFormat: Format[PostContent] = objectFormat("author", "title", "body")(PostContent.apply)(PostContent.unapply)
   implicit val CommentContentFormat: Format[CommentContent] = objectFormat("commenter", "body")(CommentContent.apply)(CommentContent.unapply)
 
@@ -51,10 +61,4 @@ object PostEvent {
     "PostDeleted"    -> objectFormat("postId")(PostDeleted.apply)(PostDeleted.unapply),
     "CommentAdded"   -> objectFormat("postId", "commentId", "content")(CommentAdded.apply)(CommentAdded.unapply),
     "CommentDeleted" -> objectFormat("postId", "commentId")(CommentDeleted.apply)(CommentDeleted.unapply))
-
-  def conflictsWith(committed: PostEvent, attempted: PostEvent) = (committed, attempted) match {
-    case (a: PostCommentEvent, b: PostCommentEvent) => a.commentId == b.commentId
-    case (_: PostCommentEvent, _)                   => false
-    case _                                          => true
-  }
 }

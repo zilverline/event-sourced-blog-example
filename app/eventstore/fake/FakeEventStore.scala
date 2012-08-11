@@ -11,7 +11,7 @@ object FakeEventStore {
     val result = new FakeEventStore[Event]
     for ((streamId, event) <- events) {
       val expected = result.reader.streamRevision(streamId)
-      result.committer.tryCommit(streamId, expected, event)
+      result.committer.tryCommit(Update(streamId, expected, event))
     }
     result
   }
@@ -42,21 +42,21 @@ class FakeEventStore[Event] extends EventStore[Event] {
   override object committer extends EventCommitter[Event] {
     import reader._
 
-    override def tryCommit(streamId: String, expected: StreamRevision, event: Event): CommitResult[Event] = {
+    override def tryCommit(append: Update[Event]): CommitResult[Event] = {
       require(Txn.findCurrent.isEmpty, "the fake event store cannot participate in an STM transaction, just like a real event store")
 
       atomic { implicit txn =>
-        val actual = streamRevision(streamId)
+        val actual = streamRevision(append.streamId)
 
-        if (expected < actual) {
-          val conflicting = readStream(streamId, since = expected)
-          Left(Conflict(streamId, actual, expected, conflicting))
-        } else if (expected > actual) {
-          throw new IllegalArgumentException("expected revision %d greater than actual revision %d" format (expected.value, actual.value))
+        if (append.expected < actual) {
+          val conflicting = readStream(append.streamId, since = append.expected)
+          Left(Conflict(append.streamId, actual, append.expected, conflicting))
+        } else if (append.expected > actual) {
+          throw new IllegalArgumentException("expected revision %d greater than actual revision %d" format (append.expected.value, actual.value))
         } else {
-          val commit = Commit(storeRevision.next, DateTimeUtils.currentTimeMillis, streamId, actual.next, Seq(event))
+          val commit = Commit(storeRevision.next, DateTimeUtils.currentTimeMillis, append.streamId, actual.next, Seq(append.event))
           commits.transform(_ :+ commit)
-          streams.transform(streams => streams.updated(streamId, streams.getOrElse(streamId, Vector.empty) :+ commit))
+          streams.transform(streams => streams.updated(append.streamId, streams.getOrElse(append.streamId, Vector.empty) :+ commit))
           Right(commit)
         }
       }

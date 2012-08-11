@@ -1,6 +1,7 @@
 package eventstore
 
 import play.api.libs.json._
+import support.EventDescriptor
 import support.JsonMapping._
 
 /**
@@ -50,6 +51,17 @@ object StreamRevision {
 }
 
 /**
+ * Represents an event that can be committed to a stream.
+ */
+case class Update[+Event](streamId: String, expected: StreamRevision, event: Event)
+object Update {
+  def apply[Event](expected: StreamRevision, event: Event)(implicit descriptor: EventDescriptor[Event]): Update[Event] =
+    Update(descriptor.streamId(event), expected, event)
+
+  implicit def pairToUpdate[Event: EventDescriptor](p: (StreamRevision, Event)): Update[Event] = Update(p._1, p._2)
+}
+
+/**
  * A successful commit to `streamId`.
  */
 case class Commit[+Event](storeRevision: StoreRevision, timestamp: Long, streamId: String, streamRevision: StreamRevision, events: Seq[Event]) {
@@ -62,12 +74,11 @@ object Commit {
 /**
  * The conflict that occurred while trying to commit to `streamId`.
  */
-case class Conflict[+Event](streamId: String, actual: StreamRevision, expected: StreamRevision, conflicting: Seq[Commit[Event]]) {
+case class Conflict[+Event](streamId: String, actual: StreamRevision, expected: StreamRevision, commits: Seq[Commit[Event]]) {
   require(actual > expected, "actual > expected")
-  require(conflicting.nonEmpty, "conflicting.nonEmpty")
+  require(commits.nonEmpty, "commits.nonEmpty")
 
-  def events: Seq[Event] = conflicting.flatMap(_.events)
-  def lastModifiedRevision: StoreRevision = conflicting.last.storeRevision
+  def events: Seq[Event] = commits.flatMap(_.events)
 }
 object Conflict {
   implicit def ConflictFormat[Event: Format]: Format[Conflict[Event]] = objectFormat("streamId", "actual", "expected", "conflicting")(apply[Event] _)(unapply)
@@ -87,7 +98,7 @@ trait CommitReader[Event] {
  * Commits events to an event store.
  */
 trait EventCommitter[Event] {
-  def tryCommit(streamId: String, expected: StreamRevision, event: Event): CommitResult[Event]
+  def tryCommit(append: Update[Event]): CommitResult[Event]
 }
 
 /**

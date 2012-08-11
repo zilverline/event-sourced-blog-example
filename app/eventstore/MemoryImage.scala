@@ -2,14 +2,15 @@ package eventstore
 
 import scala.concurrent.stm._
 import scala.annotation.tailrec
+import support.ConflictResolver
 
 sealed trait Transaction[+Event, +A]
 private case class TransactionAbort[A](onAbort: () => A) extends Transaction[Nothing, A]
-private case class TransactionCommit[Event, A](event: Event, onCommit: () => A, onConflict: (StreamRevision, Seq[Event]) => A, conflictResolver: ConflictResolver[Event]) extends Transaction[Event, A]
+private case class TransactionCommit[Event, A](append: Update[Event], onCommit: () => A, onConflict: (StreamRevision, Seq[Event]) => A) extends Transaction[Event, A]
 
 object Transaction {
-  def commit[Event, A](event: Event)(onCommit: => A, onConflict: (StreamRevision, Seq[Event]) => A)(implicit resolver: ConflictResolver[Event]): Transaction[Event, A] =
-    TransactionCommit(event, () => onCommit, onConflict, resolver)
+  def commit[Event, A](append: Update[Event])(onCommit: => A, onConflict: (StreamRevision, Seq[Event]) => A): Transaction[Event, A] =
+    TransactionCommit(append, () => onCommit, onConflict)
 
   def abort[A](value: => A): Transaction[Nothing, A] = TransactionAbort(() => value)
 }
@@ -34,34 +35,35 @@ class MemoryImage[State, Event] private (eventStore: EventStore[Event])(initialS
    * The current state of the memory image with at least all commits applied
    * that have been committed to the underlying event store.
    */
-  def get: State = get(eventStore.reader.storeRevision)._2
+  def get: State = getWithRevisionAt(eventStore.reader.storeRevision)._1
 
   /**
    * Runs the provided `body` against this event store and attempts to commit
    * the produced event. The transaction is automatically retried when a write
    * conflict is detected, so the provided `body` must be side-effect free.
    */
-  def modify[A](streamId: String, expected: StreamRevision)(body: State => Transaction[Event, A]): A = {
+  def modify[A](body: State => Transaction[Event, A])(implicit resolver: ConflictResolver[Event]): A = {
     @tailrec def runTransaction(minimum: StoreRevision): A = {
-      val (transactionRevision, state) = get(minimum)
+      val (state, transactionRevision) = getWithRevisionAt(minimum)
       body(state) match {
         case TransactionAbort(onAbort) =>
           onAbort()
-        case TransactionCommit(event, onCommit, onConflict, resolver) =>
-          eventStore.committer.tryCommit(streamId, expected, event) match {
+        case TransactionCommit(append, onCommit, onConflict) =>
+          eventStore.committer.tryCommit(append) match {
             case Right(commit) =>
               onCommit()
             case Left(conflict) =>
-              if (transactionRevision < conflict.lastModifiedRevision) {
-                runTransaction(conflict.lastModifiedRevision)
+              val conflictRevision = conflict.commits.last.storeRevision
+              if (transactionRevision < conflictRevision) {
+                runTransaction(conflictRevision)
               } else {
-                val conflicts = conflict.events.filter(resolver(event))
-                if (conflicts.nonEmpty) {
-                  onConflict(conflict.actual, conflicts)
+                val conflicting = conflict.events.filter(resolver(_, append.event))
+                if (conflicting.nonEmpty) {
+                  onConflict(conflict.actual, conflicting)
                 } else {
-                  eventStore.committer.tryCommit(streamId, conflict.actual, event) match {
+                  eventStore.committer.tryCommit(append) match {
                     case Right(commit)  => onCommit()
-                    case Left(conflict) => runTransaction(conflict.conflicting.last.storeRevision)
+                    case Left(conflict) => runTransaction(conflictRevision)
                   }
                 }
               }
@@ -74,9 +76,9 @@ class MemoryImage[State, Event] private (eventStore: EventStore[Event])(initialS
 
   override def toString = "MemoryImage(%s, %s)".format(revision.single.get, eventStore)
 
-  private[this] def get(minimum: StoreRevision): (StoreRevision, State) = atomic { implicit txn =>
+  private[this] def getWithRevisionAt(minimum: StoreRevision): (State, StoreRevision) = atomic { implicit txn =>
     if (revision() < minimum) retry
-    else (revision(), state())
+    else (state(), revision())
   }
 
   // Subscribe to the underlying event store and apply every commit to the
