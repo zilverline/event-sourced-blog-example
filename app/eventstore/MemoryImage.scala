@@ -4,14 +4,30 @@ import scala.concurrent.stm._
 import scala.annotation.tailrec
 import support.ConflictResolver
 
-sealed trait Transaction[+Event, +A]
-private case class TransactionAbort[A](onAbort: () => A) extends Transaction[Nothing, A]
-private case class TransactionCommit[Event, A](append: Update[Event], onCommit: () => A, onConflict: (StreamRevision, Seq[Event]) => A) extends Transaction[Event, A]
+/**
+ * The result of running a transaction body against the memory image.
+ */
+sealed trait Transaction[+Event, +A] {
+  def map[B](f: A => B): Transaction[Event, B]
+}
+private case class TransactionAbort[A](onAbort: () => A) extends Transaction[Nothing, A] {
+  override def map[B](f: A => B): Transaction[Nothing, B] = Transaction.abort(f(onAbort()))
+}
+private case class TransactionCommit[Event, A](append: Update[Event], onCommit: () => A, onConflict: (StreamRevision, Seq[Event]) => A) extends Transaction[Event, A] {
+  override def map[B](f: A => B): Transaction[Event, B] = Transaction.commit(append)(f(onCommit()), (actual, events) => f(onConflict(actual, events)))
+}
 
 object Transaction {
+  /**
+   * Transaction result that will commit `append` against the event store when run.
+   */
   def commit[Event, A](append: Update[Event])(onCommit: => A, onConflict: (StreamRevision, Seq[Event]) => A): Transaction[Event, A] =
     TransactionCommit(append, () => onCommit, onConflict)
 
+  /**
+   * Transaction result that simply returns `value` when run, without modifying
+   * the event store.
+   */
   def abort[A](value: => A): Transaction[Nothing, A] = TransactionAbort(() => value)
 }
 

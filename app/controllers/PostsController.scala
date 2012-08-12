@@ -15,28 +15,6 @@ import support.ConflictResolver
 object PostsController extends PostsController(Global.persistence.memoryImage)
 class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Controller {
   /**
-   * The current blog posts from the memory image.
-   */
-  def posts(): Posts = memoryImage.get
-
-  implicit def reader = (posts: Posts, id: PostId) => posts.get(id)
-
-  private[this] def notFound(request: Request[_]) = NotFound(views.html.defaultpages.notFound(request, None))
-
-  private[this] def withPost(postId: PostId, notFound: Request[_] => Result = notFound)(found: Post => Result)(implicit request: Request[_]) = {
-    posts().get(postId).map(found).getOrElse(notFound(request))
-  }
-
-  private[this] def updatePost(postId: PostId, notFound: Request[_] => Result = notFound)(body: Post => Transaction[PostEvent, Result])(implicit request: Request[_]): Result = {
-    memoryImage.modify { posts =>
-      posts.get(postId) match {
-        case None       => Transaction.abort(notFound(request))
-        case Some(post) => body(post)
-      }
-    }
-  }
-
-  /*
    * Blog content form definition.
    */
   val postContentForm = Form(mapping(
@@ -55,9 +33,9 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
    * Show a specific blog post.
    */
   def show(id: PostId) = Action { implicit request =>
-    withPost(id) { post =>
+    posts().get(id) map { post =>
       Ok(views.html.posts.show(post, comments.commentContentForm))
-    }
+    } getOrElse notFound
   }
 
   /**
@@ -70,12 +48,14 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
 
     def submit(id: PostId) = Action { implicit request =>
       postContentForm.bindFromRequest.fold(
-        formWithErrors => BadRequest(views.html.posts.add(id, formWithErrors)),
-        postContent => memoryImage.modify { _ =>
-          Transaction.commit(StreamRevision.Initial -> PostAdded(id, postContent))(
-            onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post added."),
-            onConflict = (actual, conflicts) => Conflict(views.html.posts.edit(id, actual, postContentForm.fill(postContent), conflicts)))
-        })
+        formWithErrors =>
+          BadRequest(views.html.posts.add(id, formWithErrors)),
+        postContent =>
+          memoryImage.modify { _ =>
+            Transaction.commit(StreamRevision.Initial -> PostAdded(id, postContent))(
+              onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post added."),
+              onConflict = (actual, conflicts) => Conflict(views.html.posts.edit(id, actual, postContentForm.fill(postContent), conflicts)))
+          })
     }
   }
 
@@ -84,20 +64,21 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
    */
   object edit {
     def show(id: PostId) = Action { implicit request =>
-      withPost(id) { post =>
+      posts.get(id) map { post =>
         Ok(views.html.posts.edit(post.id, post.revision, postContentForm.fill(post.content)))
-      }
+      } getOrElse notFound
     }
 
     def submit(id: PostId, expected: StreamRevision) = Action { implicit request =>
       updatePost(id) { post =>
         postContentForm.bindFromRequest.fold(
-          formWithErrors => Transaction.abort(BadRequest(views.html.posts.edit(id, expected, formWithErrors))),
+          formWithErrors =>
+            Transaction.abort(BadRequest(views.html.posts.edit(id, expected, formWithErrors))),
           postContent =>
             Transaction.commit(expected -> PostEdited(id, postContent))(
-              onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post saved."),
+              onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post saved."): Result,
               onConflict = (actual, conflicts) => Conflict(views.html.posts.edit(id, actual, postContentForm.fill(postContent), conflicts))))
-      }
+      } getOrElse notFound
     }
   }
 
@@ -106,11 +87,11 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
    */
   def delete(id: PostId, expected: StreamRevision) = Action { implicit request =>
     def deletedResult = Redirect(routes.PostsController.index).flashing("info" -> "Post deleted.")
-    updatePost(id, notFound = _ => deletedResult) { post =>
+    updatePost(id) { post =>
       Transaction.commit(expected -> PostDeleted(id))(
         onCommit = deletedResult,
         onConflict = (actual, conflicts) => Conflict(views.html.posts.index(posts().mostRecent(20), conflicts)))
-    }
+    } getOrElse deletedResult
   }
 
   /**
@@ -124,24 +105,50 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
     def add(postId: PostId, expected: StreamRevision) = Action { implicit request =>
       updatePost(postId) { post =>
         commentContentForm.bindFromRequest.fold(
-          formWithErrors => Transaction.abort(BadRequest(views.html.posts.show(post, formWithErrors))),
+          formWithErrors =>
+            Transaction.abort(BadRequest(views.html.posts.show(post, formWithErrors))),
           commentContent =>
             Transaction.commit(expected -> CommentAdded(postId, post.nextCommentId, commentContent))(
               onCommit = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment added."),
               onConflict = (actual, conflicts) => Conflict(views.html.posts.show(post, commentContentForm.fill(commentContent), conflicts))))
-      }
+      } getOrElse notFound
     }
 
     def delete(postId: PostId, expected: StreamRevision, commentId: CommentId) = Action { implicit request =>
       updatePost(postId) { post =>
         def deletedResult = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment deleted.")
         post.comments.get(commentId) match {
-          case None => Transaction.abort(deletedResult)
+          case None =>
+            Transaction.abort(deletedResult)
           case Some(comment) =>
             Transaction.commit(expected -> CommentDeleted(postId, commentId))(
               onCommit = deletedResult,
               onConflict = (actual, conflicts) => Conflict(views.html.posts.show(post, commentContentForm, conflicts)))
         }
+      } getOrElse notFound
+    }
+  }
+
+  /**
+   * The current blog posts from the memory image.
+   */
+  private[this] def posts(): Posts = memoryImage.get
+
+  /**
+   * 404 Not Found response.
+   */
+  private[this] def notFound(implicit request: Request[_]): Result = NotFound(views.html.defaultpages.notFound(request, None))
+
+  /**
+   * Runs the transaction `body` against the post identified by `postId` and
+   * returns the result, if it exists. Otherwise `None` is returned.
+   */
+  private[this] def updatePost[A](id: PostId)(body: Post => Transaction[PostEvent, A]): Option[A] = {
+    memoryImage.modify { posts =>
+      posts.get(id).map { post =>
+        body(post).map(a => Some(a))
+      }.getOrElse {
+        Transaction.abort(None)
       }
     }
   }
