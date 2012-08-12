@@ -151,16 +151,16 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
     val event2 = Gen.alphaStr.sample.get
 
     "commit initial event to stream" in new fixture {
-      val result = subject.committer.tryCommit(Update(id, StreamRevision.Initial, event))
+      val result = subject.committer.tryCommit(Changes(id, StreamRevision.Initial, event))
 
       result must_== Right(Commit(StoreRevision(1), now, id, StreamRevision(1), Seq(event)))
       subject.reader.storeRevision must_== StoreRevision.Initial.next
     }
 
     "detect and return conflicting events" in new fixture {
-      subject.committer.tryCommit(Update(id, StreamRevision.Initial, event1))
+      subject.committer.tryCommit(Changes(id, StreamRevision.Initial, event1))
 
-      val result = subject.committer.tryCommit(Update(id, StreamRevision.Initial, event2))
+      val result = subject.committer.tryCommit(Changes(id, StreamRevision.Initial, event2))
 
       result must_== Left(Conflict(
         streamId = id,
@@ -170,7 +170,7 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
     }
 
     "store commits" in new fixture {
-      subject.committer.tryCommit(Update("streamId", StreamRevision(0), "event"))
+      subject.committer.tryCommit(Changes("streamId", StreamRevision(0), "event"))
 
       subject.reader.readStream("streamId") must_== Seq(Commit(StoreRevision(1), now, "streamId", StreamRevision(1), Seq("event")))
     }
@@ -180,7 +180,7 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
         val startRevision = subject.reader.storeRevision
         for (streamId <- streamIds) {
           val currentRevision = subject.reader.storeRevision
-          subject.committer.tryCommit(Update(streamId, StreamRevision.Initial, "event")) must beRight
+          subject.committer.tryCommit(Changes(streamId, StreamRevision.Initial, "event")) must beRight
           subject.reader.storeRevision must_== currentRevision.next
         }
 
@@ -189,8 +189,8 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
     }
 
     "not store conflicts" in new fixture {
-      subject.committer.tryCommit(Update(id, StreamRevision.Initial, event1))
-      subject.committer.tryCommit(Update(id, StreamRevision.Initial, event2))
+      subject.committer.tryCommit(Changes(id, StreamRevision.Initial, event1))
+      subject.committer.tryCommit(Changes(id, StreamRevision.Initial, event2))
 
       subject.reader.readStream(id) must_== Seq(Commit(StoreRevision(1), now, id, StreamRevision(1), Seq(event1)))
     }
@@ -247,7 +247,7 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
 
     def commitMany(streamIds: List[String]) {
       for (streamId <- streamIds) {
-        subject.committer.tryCommit(Update(streamId, StreamRevision.Initial, "event")) must beRight
+        subject.committer.tryCommit(Changes(streamId, StreamRevision.Initial, "event")) must beRight
       }
     }
 

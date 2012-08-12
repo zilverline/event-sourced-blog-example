@@ -19,17 +19,17 @@ trait RedisWatchMultiExecEventCommitter[Event] { this: RedisEventStore[Event] =>
 
     private[this] val lock = new Object
 
-    override def tryCommit(append: Update[Event]): CommitResult[Event] = {
+    override def tryCommit(changes: Changes[Event]): CommitResult[Event] = {
       val backoff = new Backoff
-      val streamKey = keyForStream(append.streamId)
+      val streamKey = keyForStream(changes.streamId)
       val result = withJedis { implicit jedis =>
         @tailrec def tryCommitWithRetry: Either[StreamRevision, Commit[Event]] = {
           val (storeRevision, actual) = prepareCommit(streamKey)
 
-          if (append.expected != actual) {
-            abortCommit(append.streamId, actual, append.expected)
+          if (changes.expected != actual) {
+            abortCommit(changes.streamId, actual, changes.expected)
           } else {
-            val commit = Commit(storeRevision.next, DateTimeUtils.currentTimeMillis, append.streamId, actual.next, Seq(append.event))
+            val commit = Commit(storeRevision.next, DateTimeUtils.currentTimeMillis, changes.streamId, actual.next, changes.events)
             if (doCommit(streamKey, commit)) {
               Right(commit)
             } else {
@@ -46,8 +46,8 @@ trait RedisWatchMultiExecEventCommitter[Event] { this: RedisEventStore[Event] =>
       }
 
       result.left.map { actual =>
-        val conflicting = readStream(append.streamId, since = append.expected)
-        Conflict(append.streamId, actual, append.expected, conflicting)
+        val conflicting = readStream(changes.streamId, since = changes.expected)
+        Conflict(changes.streamId, actual, changes.expected, conflicting)
       }
     }
 

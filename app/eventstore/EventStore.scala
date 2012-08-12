@@ -51,14 +51,15 @@ object StreamRevision {
 }
 
 /**
- * Represents an event that can be committed to a stream.
+ * Represents the changes that can be committed atomically to the event store.
  */
-case class Update[+Event](streamId: String, expected: StreamRevision, event: Event)
-object Update {
-  def apply[Event](expected: StreamRevision, event: Event)(implicit descriptor: EventDescriptor[Event]): Update[Event] =
-    Update(descriptor.streamId(event), expected, event)
+case class Changes[+Event](streamId: String, expected: StreamRevision, events: Seq[Event])
+object Changes {
+  def apply[Event](streamId: String, expected: StreamRevision, event: Event): Changes[Event] = Changes(streamId, expected, Seq(event))
+  def apply[Event](expected: StreamRevision, event: Event)(implicit descriptor: EventDescriptor[Event]): Changes[Event] =
+    Changes(descriptor.streamId(event), expected, event)
 
-  implicit def pairToUpdate[Event: EventDescriptor](p: (StreamRevision, Event)): Update[Event] = Update(p._1, p._2)
+  implicit def pairToChanges[Event: EventDescriptor](p: (StreamRevision, Event)): Changes[Event] = Changes(p._1, p._2)
 }
 
 /**
@@ -98,7 +99,7 @@ trait CommitReader[Event] {
  * Commits events to an event store.
  */
 trait EventCommitter[Event] {
-  def tryCommit(append: Update[Event]): CommitResult[Event]
+  def tryCommit(changes: Changes[Event]): CommitResult[Event]
 }
 
 /**

@@ -5,34 +5,37 @@ import scala.annotation.tailrec
 import support.ConflictsWith
 
 /**
- * The result of running a transaction body against the memory image.
+ * The transaction to commit to the event when modifying the memory image.
  */
 sealed trait Transaction[+Event, +A] {
+  /**
+   * Maps the result of this transaction from `A` to `B` using `f`.
+   */
   def map[B](f: A => B): Transaction[Event, B]
+}
+object Transaction {
+  /**
+   * Transaction result that will commit the  `changes` to the event store.
+   */
+  def commit[Event, A](changes: Changes[Event])(onCommit: => A, onConflict: (StreamRevision, Seq[Event]) => A): Transaction[Event, A] =
+    new TransactionCommit(changes, () => onCommit, onConflict)
+
+  /**
+   * Transaction result that simply returns `value` when run, without
+   * committing anything the event store.
+   */
+  def abort[A](value: => A): Transaction[Nothing, A] = new TransactionAbort(() => value)
 }
 private case class TransactionAbort[A](onAbort: () => A) extends Transaction[Nothing, A] {
   override def map[B](f: A => B): Transaction[Nothing, B] = Transaction.abort(f(onAbort()))
 }
-private case class TransactionCommit[Event, A](append: Update[Event], onCommit: () => A, onConflict: (StreamRevision, Seq[Event]) => A) extends Transaction[Event, A] {
-  override def map[B](f: A => B): Transaction[Event, B] = Transaction.commit(append)(f(onCommit()), (actual, events) => f(onConflict(actual, events)))
-}
-
-object Transaction {
-  /**
-   * Transaction result that will commit `append` against the event store when run.
-   */
-  def commit[Event, A](append: Update[Event])(onCommit: => A, onConflict: (StreamRevision, Seq[Event]) => A): Transaction[Event, A] =
-    TransactionCommit(append, () => onCommit, onConflict)
-
-  /**
-   * Transaction result that simply returns `value` when run, without modifying
-   * the event store.
-   */
-  def abort[A](value: => A): Transaction[Nothing, A] = TransactionAbort(() => value)
+private case class TransactionCommit[Event, A](changes: Changes[Event], onCommit: () => A, onConflict: (StreamRevision, Seq[Event]) => A) extends Transaction[Event, A] {
+  override def map[B](f: A => B): Transaction[Event, B] =
+    Transaction.commit(changes)(f(onCommit()), (actual, events) => f(onConflict(actual, events)))
 }
 
 /**
- * Factory methods for a `MemoryImage`
+ * Factory methods for a `MemoryImage`.
  */
 object MemoryImage {
   def apply[State, Event](eventStore: EventStore[Event])(initialState: State)(update: (State, Commit[Event]) => State) = new MemoryImage(eventStore)(initialState)(update)
@@ -64,8 +67,8 @@ class MemoryImage[State, Event] private (eventStore: EventStore[Event])(initialS
       body(state) match {
         case TransactionAbort(onAbort) =>
           onAbort()
-        case TransactionCommit(append, onCommit, onConflict) =>
-          eventStore.committer.tryCommit(append) match {
+        case TransactionCommit(changes, onCommit, onConflict) =>
+          eventStore.committer.tryCommit(changes) match {
             case Right(commit) =>
               onCommit()
             case Left(conflict) =>
@@ -73,11 +76,11 @@ class MemoryImage[State, Event] private (eventStore: EventStore[Event])(initialS
               if (transactionRevision < conflictRevision) {
                 runTransaction(conflictRevision)
               } else {
-                val conflicting = conflict.events.filter(conflictsWith(_, append.event))
+                val conflicting = conflictsWith.conflicting(conflict.events, changes.events)
                 if (conflicting.nonEmpty) {
                   onConflict(conflict.actual, conflicting)
                 } else {
-                  eventStore.committer.tryCommit(append) match {
+                  eventStore.committer.tryCommit(changes.copy(expected = conflict.actual)) match {
                     case Right(commit)  => onCommit()
                     case Left(conflict) => runTransaction(conflictRevision)
                   }

@@ -39,22 +39,22 @@ trait RedisLuaEventCommitter[Event] { this: RedisEventStore[Event] =>
   Logger.debug("Redis Lua TryCommitScript loaded with id " + TryCommitScriptId)
 
   object committer extends EventCommitter[Event] {
-    override def tryCommit(append: Update[Event]): CommitResult[Event] = {
+    override def tryCommit(changes: Changes[Event]): CommitResult[Event] = {
       val timestamp = DateTimeUtils.currentTimeMillis
-      val serializedEvents = Json.stringify(Json.toJson(Seq(append.event))(Writes.seqWrites(eventFormat)))
+      val serializedEvents = Json.stringify(Json.toJson(changes.events)(Writes.seqWrites(eventFormat)))
 
       val response = withJedis { _.evalsha(TryCommitScriptId, 2,
-        /* KEYS */ CommitsKey, keyForStream(append.streamId),
-        /* ARGV */ timestamp.toString, append.streamId, append.expected.value.toString, serializedEvents)
+        /* KEYS */ CommitsKey, keyForStream(changes.streamId),
+        /* ARGV */ timestamp.toString, changes.streamId, changes.expected.value.toString, serializedEvents)
       }
 
       try {
         response.asInstanceOf[java.util.List[_]].asScala match {
           case Seq("conflict", actual: String) =>
-            val conflicting = reader.readStream(append.streamId, since = append.expected)
-            Left(Conflict(append.streamId, StreamRevision(actual.toLong), append.expected, conflicting))
+            val conflicting = reader.readStream(changes.streamId, since = changes.expected)
+            Left(Conflict(changes.streamId, StreamRevision(actual.toLong), changes.expected, conflicting))
           case Seq("commit", storeRevision: String) =>
-            Right(Commit(StoreRevision(storeRevision.toLong), timestamp, append.streamId, append.expected.next, Seq(append.event)))
+            Right(Commit(StoreRevision(storeRevision.toLong), timestamp, changes.streamId, changes.expected.next, changes.events))
         }
       } catch {
         case e: Exception =>
