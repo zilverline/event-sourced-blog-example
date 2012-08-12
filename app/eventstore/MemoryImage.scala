@@ -2,7 +2,7 @@ package eventstore
 
 import scala.concurrent.stm._
 import scala.annotation.tailrec
-import support.ConflictResolver
+import support.ConflictsWith
 
 /**
  * The result of running a transaction body against the memory image.
@@ -58,7 +58,7 @@ class MemoryImage[State, Event] private (eventStore: EventStore[Event])(initialS
    * the produced event. The transaction is automatically retried when a write
    * conflict is detected, so the provided `body` must be side-effect free.
    */
-  def modify[A](body: State => Transaction[Event, A])(implicit resolver: ConflictResolver[Event]): A = {
+  def modify[A](body: State => Transaction[Event, A])(implicit conflictsWith: ConflictsWith[Event]): A = {
     @tailrec def runTransaction(minimum: StoreRevision): A = {
       val (state, transactionRevision) = getWithRevisionAt(minimum)
       body(state) match {
@@ -73,7 +73,7 @@ class MemoryImage[State, Event] private (eventStore: EventStore[Event])(initialS
               if (transactionRevision < conflictRevision) {
                 runTransaction(conflictRevision)
               } else {
-                val conflicting = conflict.events.filter(resolver(_, append.event))
+                val conflicting = conflict.events.filter(conflictsWith(_, append.event))
                 if (conflicting.nonEmpty) {
                   onConflict(conflict.actual, conflicting)
                 } else {

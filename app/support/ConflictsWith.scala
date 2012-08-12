@@ -1,10 +1,10 @@
 package support
 
-trait ConflictResolver[-Event] {
+trait ConflictsWith[-Event] {
   def apply(committed: Event, attempted: Event): Boolean
 }
-object ConflictResolver {
-  def apply[Event](predicate: (Event, Event) => Boolean) = new ConflictResolver[Event] {
+object ConflictsWith {
+  def apply[Event](predicate: (Event, Event) => Boolean) = new ConflictsWith[Event] {
     def apply(committed: Event, attempted: Event): Boolean = predicate(committed, attempted)
   }
 }

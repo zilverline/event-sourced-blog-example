@@ -2,7 +2,7 @@ package events
 
 import java.util.UUID
 import play.api.libs.json._
-import support.ConflictResolver
+import support.ConflictsWith
 import support.EventDescriptor
 import support.Identifier
 import support.IdentifierCompanion
@@ -46,7 +46,7 @@ case class CommentDeleted(postId: PostId, commentId: CommentId) extends PostComm
 object PostEvent {
   implicit val PostEventDescriptor: EventDescriptor[PostEvent] = EventDescriptor(_.postId)
 
-  implicit val PostEventConflictResolver: ConflictResolver[PostEvent] = ConflictResolver {
+  implicit val PostEventConflictsWith: ConflictsWith[PostEvent] = ConflictsWith {
     case (a: PostCommentEvent, b: PostCommentEvent) => a.commentId == b.commentId
     case (_: PostCommentEvent, _)                   => false
     case _                                          => true
