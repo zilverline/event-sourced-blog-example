@@ -58,8 +58,6 @@ object Changes {
   def apply[Event](streamId: String, expected: StreamRevision, event: Event): Changes[Event] = Changes(streamId, expected, Seq(event))
   def apply[Event](expected: StreamRevision, event: Event)(implicit descriptor: EventDescriptor[Event]): Changes[Event] =
     Changes(descriptor.streamId(event), expected, event)
-
-  implicit def pairToChanges[Event: EventDescriptor](p: (StreamRevision, Event)): Changes[Event] = Changes(p._1, p._2)
 }
 
 /**
