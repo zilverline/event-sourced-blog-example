@@ -1,0 +1,43 @@
+package events
+
+import com.lambdaworks.crypto.SCryptUtil
+import java.util.UUID
+import play.api.libs.json.Format
+import support.ConflictsWith
+import support.EventDescriptor
+import support.Identifier
+import support.IdentifierCompanion
+import support.JsonMapping._
+
+case class UserId(uuid: UUID) extends Identifier
+object UserId extends IdentifierCompanion[UserId]("UserId")
+
+case class Email(value: String)
+case class Password(hash: String) {
+  require(hash.startsWith("$s0$"), "are you sure you passed in the password hash?")
+
+  def check(password: String): Boolean = SCryptUtil.check(password, hash)
+
+  override def toString = "Password(<HASH>)"
+}
+object Password {
+  def fromPlainText(password: String) = Password(SCryptUtil.scrypt(password, 1 << 14, 8, 2))
+}
+
+sealed trait UserEvent {
+  def userId: UserId
+}
+case class UserRegistered(userId: UserId, login: Email, password: Password) extends UserEvent
+case class UserPasswordChanged(userId: UserId, password: Password) extends UserEvent
+
+object UserEvent {
+  implicit val UserEventDescriptor: EventDescriptor[UserEvent] = EventDescriptor(_.userId)
+  implicit val UserEventConflictsWith: ConflictsWith[UserEvent] = ConflictsWith { case _ => true }
+
+  implicit val EmailFormat: Format[Email] = valueFormat(Email.apply)(Email.unapply)
+  implicit val PasswordFormat: Format[Password] = valueFormat(Password.apply)(Password.unapply)
+
+  implicit val UserEventFormat: Format[UserEvent] = typeChoiceFormat(
+    "UserRegistered" -> objectFormat("userId", "login", "password")(UserRegistered.apply)(UserRegistered.unapply),
+    "UserPasswordChanged" -> objectFormat("userId", "password")(UserPasswordChanged.apply)(UserPasswordChanged.unapply))
+}
