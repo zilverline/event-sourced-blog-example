@@ -6,20 +6,17 @@ package support
  */
 trait ConflictsWith[-Event] {
   /**
-   * True if the `committed` event conflicts with the `attempted` event, false
-   * otherwise.
-   */
-  def apply(committed: Event, attempted: Event): Boolean
-
-  /**
    * Checks each `committed` event for conflicts against all `attempted` events.
    * Any committed event that conflicts is returned.
    */
-  def conflicting[E <: Event](committed: Seq[E], attempted: Seq[E]): Seq[E] =
-    committed.filter(a => attempted.exists(b => apply(a, b)))
+  def conflicting[Committed <: Event, Attempted <: Event](committed: Seq[Committed], attempted: Seq[Attempted]): Seq[Committed]
 }
 object ConflictsWith {
+  /**
+   * Builds a new `ConflictsWith` based on the given predicate.
+   */
   def apply[Event](predicate: (Event, Event) => Boolean) = new ConflictsWith[Event] {
-    override def apply(committed: Event, attempted: Event): Boolean = predicate(committed, attempted)
+    override def conflicting[Committed <: Event, Attempted <: Event](committed: Seq[Committed], attempted: Seq[Attempted]): Seq[Committed] =
+      committed.filter(a => attempted.exists(b => predicate(a, b)))
   }
 }
