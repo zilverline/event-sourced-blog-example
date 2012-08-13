@@ -13,3 +13,4 @@ target/
 tmp
 .history
 dist
+/bin/
