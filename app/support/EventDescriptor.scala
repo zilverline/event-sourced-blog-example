@@ -1,5 +1,8 @@
 package support
 
+/**
+ * Descriptor to extract the event store stream identifier from an event.
+ */
 trait EventDescriptor[-Event] {
   def streamId(event: Event): String
 }

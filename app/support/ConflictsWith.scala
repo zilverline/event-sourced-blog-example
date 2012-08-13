@@ -1,8 +1,8 @@
 package support
 
 /**
- * Predicate that can check a committed event against an attempted event to
- * check for conflicts.
+ * Compares committed events against an attempted events to check for
+ * conflicts.
  */
 trait ConflictsWith[-Event] {
   /**
