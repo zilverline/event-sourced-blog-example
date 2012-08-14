@@ -13,12 +13,6 @@ object EventStoreSpec {
   implicit def arbitraryStreamRevision: Arbitrary[StreamRevision] = Arbitrary(Gen.chooseNum(StreamRevision.Initial.value, StreamRevision.Maximum.value).map(StreamRevision.apply))
 
   implicit def arbitraryCommit[Event: Arbitrary]: Arbitrary[Commit[Event]] = Arbitrary(Gen.resultOf(Commit.apply[Event] _))
-  implicit def arbitraryConflict[Event: Arbitrary]: Arbitrary[Conflict[Event]] = Arbitrary(for {
-    actual <- arbitrary[StreamRevision]
-    expected <- arbitrary[StreamRevision].suchThat(_ < actual)
-    conflicting <- Gen.resize(10, arbitrary[List[Commit[Event]]].suchThat(_.nonEmpty))
-    streamId <- arbitrary[String]
-  } yield Conflict(streamId, actual, expected, conflicting))
 }
 import EventStoreSpec._
 
@@ -109,12 +103,9 @@ class StreamRevisionSpec extends org.specs2.mutable.Specification with org.specs
 }
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class ConflictAndCommitSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
+class CommitSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
   val SerializedCommit = """{"storeRevision":5,"timestamp":1342542931694,"streamId":"StreamId","streamRevision":2,"events":["Event1","Event2"]}"""
   val ExampleCommit = Commit(StoreRevision(5), 1342542931694L, "StreamId", StreamRevision(2), Seq("Event1", "Event2"))
-
-  val SerializedConflict = """{"streamId":"StreamId","actual":2,"expected":1,"conflicting":[%s]}""".format(SerializedCommit)
-  val ExampleConflict = Conflict("StreamId", actual = StreamRevision(2), expected = StreamRevision(1), commits = Seq(ExampleCommit))
 
   "Commits" should {
     "deserialize example JSON" in {
@@ -127,16 +118,6 @@ class ConflictAndCommitSpec extends org.specs2.mutable.Specification with org.sp
 
     "combine event with stream revision" in {
       ExampleCommit.eventsWithRevision must_== Seq(("Event1", StreamRevision(2)), ("Event2", StreamRevision(2)))
-    }
-  }
-
-  "Conflicts" should {
-    "deserialize example JSON" in {
-      Json.fromJson[Conflict[String]](Json.parse(SerializedConflict)) must_== ExampleConflict
-    }
-
-    "be serializable to and from JSON" in forAll { (conflict: Conflict[String]) =>
-      Json.fromJson[Conflict[String]](Json.toJson(conflict)) must_== conflict
     }
   }
 }
@@ -162,11 +143,11 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
 
       val result = subject.committer.tryCommit(Changes(id, StreamRevision.Initial, event2))
 
-      result must_== Left(Conflict(
-        streamId = id,
-        actual = StreamRevision.Initial.next,
-        expected = StreamRevision.Initial,
-        commits = Seq(Commit(StoreRevision(1), now, id, StreamRevision(1), Seq(event1)))))
+      result must beLeft
+      result.left.get.streamId must_== id
+      result.left.get.actual must_== StreamRevision.Initial.next
+      result.left.get.expected must_== StreamRevision.Initial
+      result.left.get.commits must_== Seq(Commit(StoreRevision(1), now, id, StreamRevision(1), Seq(event1)))
     }
 
     "store commits" in new fixture {
