@@ -1,8 +1,8 @@
 package eventstore
 
 import play.api.libs.json._
-import support.EventDescriptor
 import support.JsonMapping._
+import support.EventStreamType
 
 /**
  * The revision of an event store. The revision of an event store is
@@ -53,10 +53,12 @@ object StreamRevision {
 /**
  * Represents the changes that can be committed atomically to the event store.
  */
-case class Changes[+Event](streamId: String, expected: StreamRevision, events: Seq[Event])
+case class Changes[+Event] private (streamKey: String, expected: StreamRevision, events: Seq[Event]) {
+  def streamId[Id, E >: Event](implicit descriptor: EventStreamType[Id, E]): Id = descriptor.fromString(streamKey)
+}
 object Changes {
-  def apply[Event](streamId: String, expected: StreamRevision, event: Event): Changes[Event] = Changes(streamId, expected, Seq(event))
-  def apply[Event](expected: StreamRevision, event: Event)(implicit descriptor: EventDescriptor[Event]): Changes[Event] =
+  def apply[Id, Event](streamId: Id, expected: StreamRevision, event: Event)(implicit descriptor: EventStreamType[Id, Event]): Changes[Event] = Changes(descriptor.toString(streamId), expected, Seq(event))
+  def apply[Id, Event](expected: StreamRevision, event: Event)(implicit descriptor: EventStreamType[Id, Event]): Changes[Event] =
     Changes(descriptor.streamId(event), expected, event)
 }
 
@@ -65,6 +67,10 @@ object Changes {
  */
 case class Commit[+Event](storeRevision: StoreRevision, timestamp: Long, streamId: String, streamRevision: StreamRevision, events: Seq[Event]) {
   def eventsWithRevision: Seq[(Event, StreamRevision)] = events.map(event => (event, streamRevision))
+
+  def withOnlyEventsOfType[E](implicit manifest: Manifest[E]): Commit[E] = copy(events = events.collect {
+    case event if manifest.erasure.isInstance(event) => event.asInstanceOf[E]
+  })
 }
 object Commit {
   implicit def CommitFormat[Event: Format]: Format[Commit[Event]] = objectFormat("storeRevision", "timestamp", "streamId", "streamRevision", "events")(apply[Event] _)(unapply)
@@ -86,18 +92,18 @@ case class Conflict[+Event](commits: Seq[Commit[Event]]) {
 /**
  * Reads commits from the event store.
  */
-trait CommitReader[Event] {
+trait CommitReader[-Event] {
   def storeRevision: StoreRevision
-  def readCommits(since: StoreRevision, to: StoreRevision): Stream[Commit[Event]]
-  def streamRevision(streamId: String): StreamRevision
-  def readStream(streamId: String, since: StreamRevision = StreamRevision.Initial, to: StreamRevision = StreamRevision.Maximum): Stream[Commit[Event]]
+  def readCommits[E <: Event: Manifest](since: StoreRevision, to: StoreRevision): Stream[Commit[E]]
+  def streamRevision[Id, Event](streamId: Id)(implicit descriptor: EventStreamType[Id, Event]): StreamRevision
+  def readStream[Id, E <: Event](streamId: Id, since: StreamRevision = StreamRevision.Initial, to: StreamRevision = StreamRevision.Maximum)(implicit descriptor: EventStreamType[Id, E]): Stream[Commit[E]]
 }
 
 /**
  * Commits events to an event store.
  */
-trait EventCommitter[Event] {
-  def tryCommit(changes: Changes[Event]): CommitResult[Event]
+trait EventCommitter[-Event] {
+  def tryCommit[Id, E <: Event](changes: Changes[E])(implicit descriptor: EventStreamType[Id, E]): CommitResult[E]
 }
 
 /**
@@ -110,17 +116,17 @@ trait Subscription {
 /**
  * Publishes successful commits to subscribers.
  */
-trait CommitPublisher[Event] {
+trait CommitPublisher[-Event] {
   /**
    * Notifies `listener` of all commits that happened `since`. Notification happens asynchronously.
    */
-  def subscribe(since: StoreRevision)(listener: CommitListener[Event]): Subscription
+  def subscribe[E <: Event: Manifest](since: StoreRevision)(listener: CommitListener[E]): Subscription
 }
 
 /**
  * The event store API.
  */
-trait EventStore[Event] {
+trait EventStore[-Event] {
   /**
    * The commit reader associated with this event store.
    */

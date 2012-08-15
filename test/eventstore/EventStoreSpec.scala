@@ -5,6 +5,8 @@ import java.util.concurrent.{ CountDownLatch, TimeUnit }
 import org.joda.time.DateTimeUtils
 import org.scalacheck._, Arbitrary.arbitrary, Prop.{ forAll, forAllNoShrink }
 import play.api.libs.json._
+import EventStoreSpec._
+import support.EventStreamType
 
 object EventStoreSpec {
   private[this] implicit def arbitrarySeq[A: Arbitrary]: Arbitrary[Seq[A]] = Arbitrary(arbitrary[List[A]])
@@ -14,7 +16,6 @@ object EventStoreSpec {
 
   implicit def arbitraryCommit[Event: Arbitrary]: Arbitrary[Commit[Event]] = Arbitrary(Gen.resultOf(Commit.apply[Event] _))
 }
-import EventStoreSpec._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class StoreRevisionSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
@@ -124,6 +125,7 @@ class CommitSpec extends org.specs2.mutable.Specification with org.specs2.ScalaC
 
 trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
   val streamIdGenerator = Gen.wrap(UUID.randomUUID.toString)
+  implicit val sd: EventStreamType[String, String] = EventStreamType(s => s, s => s, s => Some(s))
 
   "An event store" should {
     val id = Gen.alphaStr.sample.get
@@ -153,7 +155,7 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
     "store commits" in new fixture {
       subject.committer.tryCommit(Changes("streamId", StreamRevision(0), "event"))
 
-      subject.reader.readStream("streamId") must_== Seq(Commit(StoreRevision(1), now, "streamId", StreamRevision(1), Seq("event")))
+      subject.reader.readStream("streamId")(sd) must_== Seq(Commit(StoreRevision(1), now, "streamId", StreamRevision(1), Seq("event")))
     }
 
     "store commits in multiple streams" in new fixture {
@@ -182,7 +184,7 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
 
         val countDown = new CountDownLatch(streamIds.size)
         val notifications = Vector.newBuilder[Commit[String]]
-        val subscription = subject.publisher.subscribe(startRevision) { commit =>
+        val subscription = subject.publisher.subscribe[String](startRevision) { commit =>
           notifications += commit
           countDown.countDown
         }
@@ -205,7 +207,7 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
         val countDown = new CountDownLatch(streamIds.size)
         val notifications = Vector.newBuilder[Commit[String]]
 
-        val subscription = subject.publisher.subscribe(startRevision) { commit =>
+        val subscription = subject.publisher.subscribe[String](startRevision) { commit =>
           notifications += commit
           countDown.countDown
         }

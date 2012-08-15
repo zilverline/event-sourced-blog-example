@@ -6,6 +6,7 @@ import play.api.Logger
 import play.api.libs.json._
 import _root_.redis.clients.jedis._
 import scala.collection.JavaConverters._
+import support.EventStreamType
 
 trait RedisLuaEventCommitter[Event] { this: RedisEventStore[Event] =>
   protected[this] def eventFormat: Format[Event]
@@ -39,13 +40,13 @@ trait RedisLuaEventCommitter[Event] { this: RedisEventStore[Event] =>
   Logger.debug("Redis Lua TryCommitScript loaded with id " + TryCommitScriptId)
 
   object committer extends EventCommitter[Event] {
-    override def tryCommit(changes: Changes[Event]): CommitResult[Event] = {
+    override def tryCommit[Id, E <: Event](changes: Changes[E])(implicit descriptor: EventStreamType[Id, E]): CommitResult[E] = {
       val timestamp = DateTimeUtils.currentTimeMillis
-      val serializedEvents = Json.stringify(Json.toJson(changes.events)(Writes.seqWrites(eventFormat)))
-
+      val serializedEvents = Json.stringify(Json.toJson(changes.events: Seq[Event])(Writes.seqWrites(eventFormat)))
+      val streamId = descriptor.toString(changes.streamId)
       val response = withJedis { _.evalsha(TryCommitScriptId, 2,
-        /* KEYS */ CommitsKey, keyForStream(changes.streamId),
-        /* ARGV */ timestamp.toString, changes.streamId, changes.expected.value.toString, serializedEvents)
+        /* KEYS */ CommitsKey, keyForStream(streamId),
+        /* ARGV */ timestamp.toString, streamId, changes.expected.value.toString, serializedEvents)
       }
 
       try {
@@ -54,7 +55,7 @@ trait RedisLuaEventCommitter[Event] { this: RedisEventStore[Event] =>
             val conflicting = reader.readStream(changes.streamId, since = changes.expected)
             Left(Conflict(conflicting))
           case Seq("commit", storeRevision: String) =>
-            Right(Commit(StoreRevision(storeRevision.toLong), timestamp, changes.streamId, changes.expected.next, changes.events))
+            Right(Commit(StoreRevision(storeRevision.toLong), timestamp, streamId, changes.expected.next, changes.events))
         }
       } catch {
         case e: Exception =>

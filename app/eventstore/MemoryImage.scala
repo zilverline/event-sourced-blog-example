@@ -3,6 +3,7 @@ package eventstore
 import scala.concurrent.stm._
 import scala.annotation.tailrec
 import support.ConflictsWith
+import support.EventStreamType
 
 /**
  * The transaction to commit to the event when modifying the memory image.
@@ -17,8 +18,8 @@ object Transaction {
   /**
    * Transaction result that will commit the  `changes` to the event store.
    */
-  def commit[Event, A](changes: Changes[Event])(onCommit: => A, onConflict: (StreamRevision, Seq[Event]) => A): Transaction[Event, A] =
-    new TransactionCommit(changes, () => onCommit, onConflict)
+  def commit[Id, Event, A](changes: Changes[Event])(onCommit: => A, onConflict: (StreamRevision, Seq[Event]) => A)(implicit descriptor: EventStreamType[Id, Event]): Transaction[Event, A] =
+    new TransactionCommit(changes, descriptor, () => onCommit, onConflict)
 
   /**
    * Transaction result that simply returns `value` when run, without
@@ -29,16 +30,16 @@ object Transaction {
 private case class TransactionAbort[A](onAbort: () => A) extends Transaction[Nothing, A] {
   override def map[B](f: A => B): Transaction[Nothing, B] = Transaction.abort(f(onAbort()))
 }
-private case class TransactionCommit[Event, A](changes: Changes[Event], onCommit: () => A, onConflict: (StreamRevision, Seq[Event]) => A) extends Transaction[Event, A] {
+private case class TransactionCommit[Id, Event, A](changes: Changes[Event], descriptor: EventStreamType[Id, Event], onCommit: () => A, onConflict: (StreamRevision, Seq[Event]) => A) extends Transaction[Event, A] {
   override def map[B](f: A => B): Transaction[Event, B] =
-    Transaction.commit(changes)(f(onCommit()), (actual, events) => f(onConflict(actual, events)))
+    Transaction.commit(changes)(f(onCommit()), (actual, events) => f(onConflict(actual, events)))(descriptor)
 }
 
 /**
  * Factory methods for a `MemoryImage`.
  */
 object MemoryImage {
-  def apply[State, Event](eventStore: EventStore[Event])(initialState: State)(update: (State, Commit[Event]) => State) = new MemoryImage(eventStore)(initialState)(update)
+  def apply[State, Event: Manifest](eventStore: EventStore[Event])(initialState: State)(update: (State, Commit[Event]) => State) = new MemoryImage(eventStore)(initialState)(update)
 }
 
 /**
@@ -46,7 +47,7 @@ object MemoryImage {
  * `initialState` and `update` to project the committed events onto the
  * current state.
  */
-class MemoryImage[State, Event] private (eventStore: EventStore[Event])(initialState: State)(update: (State, Commit[Event]) => State) {
+class MemoryImage[State, -Event: Manifest] private (eventStore: EventStore[Event])(initialState: State)(update: (State, Commit[Event]) => State) {
   private[this] val state = Ref(initialState)
   private[this] val revision = Ref(StoreRevision.Initial)
 
@@ -61,14 +62,14 @@ class MemoryImage[State, Event] private (eventStore: EventStore[Event])(initialS
    * the produced event. The transaction is automatically retried when a write
    * conflict is detected, so the provided `body` must be side-effect free.
    */
-  def modify[A](body: State => Transaction[Event, A])(implicit conflictsWith: ConflictsWith[Event]): A = {
+  def modify[A, E <: Event](body: State => Transaction[E, A])(implicit conflictsWith: ConflictsWith[E]): A = {
     @tailrec def runTransaction(minimum: StoreRevision): A = {
       val (state, transactionRevision) = getWithRevisionAt(minimum)
       body(state) match {
         case TransactionAbort(onAbort) =>
           onAbort()
-        case TransactionCommit(changes, onCommit, onConflict) =>
-          eventStore.committer.tryCommit(changes) match {
+        case TransactionCommit(changes, descriptor, onCommit, onConflict) =>
+          eventStore.committer.tryCommit(changes)(descriptor) match {
             case Right(commit) =>
               onCommit()
             case Left(conflict) =>
@@ -80,7 +81,7 @@ class MemoryImage[State, Event] private (eventStore: EventStore[Event])(initialS
                 if (conflicting.nonEmpty) {
                   onConflict(conflict.actual, conflicting)
                 } else {
-                  eventStore.committer.tryCommit(changes.copy(expected = conflict.actual)) match {
+                  eventStore.committer.tryCommit(changes.copy(expected = conflict.actual))(descriptor) match {
                     case Right(commit)  => onCommit()
                     case Left(conflict) => runTransaction(conflictRevision)
                   }
@@ -102,7 +103,7 @@ class MemoryImage[State, Event] private (eventStore: EventStore[Event])(initialS
 
   // Subscribe to the underlying event store and apply every commit to the
   // current state using the provided `update` function.
-  eventStore.publisher.subscribe(StoreRevision.Initial) { commit =>
+  eventStore.publisher.subscribe[Event](StoreRevision.Initial) { commit =>
     atomic { implicit txn =>
       require(revision().next == commit.storeRevision, "expected: " + revision().next + ", got " + commit.storeRevision)
 

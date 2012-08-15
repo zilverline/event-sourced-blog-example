@@ -6,6 +6,7 @@ import play.api.libs.json._
 import _root_.redis.clients.jedis._
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
+import support.EventStreamType
 
 /**
  * Redis event committer that uses the WATCH/MULTI/EXEC commands to ensure the event store's
@@ -19,17 +20,18 @@ trait RedisWatchMultiExecEventCommitter[Event] { this: RedisEventStore[Event] =>
 
     private[this] val lock = new Object
 
-    override def tryCommit(changes: Changes[Event]): CommitResult[Event] = {
+    override def tryCommit[Id, E <: Event](changes: Changes[E])(implicit descriptor: EventStreamType[Id, E]): CommitResult[E] = {
       val backoff = new Backoff
-      val streamKey = keyForStream(changes.streamId)
+      val streamId = descriptor.toString(changes.streamId)
+      val streamKey = keyForStream(streamId)
       val result = withJedis { implicit jedis =>
-        @tailrec def tryCommitWithRetry: Either[StreamRevision, Commit[Event]] = {
+        @tailrec def tryCommitWithRetry: Either[StreamRevision, Commit[E]] = {
           val (storeRevision, actual) = prepareCommit(streamKey)
 
           if (changes.expected != actual) {
-            abortCommit(changes.streamId, actual, changes.expected)
+            abortCommit(streamId, actual, changes.expected)
           } else {
-            val commit = Commit(storeRevision.next, DateTimeUtils.currentTimeMillis, changes.streamId, actual.next, changes.events)
+            val commit = Commit(storeRevision.next, DateTimeUtils.currentTimeMillis, streamId, actual.next, changes.events)
             if (doCommit(streamKey, commit)) {
               Right(commit)
             } else {

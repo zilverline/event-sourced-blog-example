@@ -10,6 +10,7 @@ import play.api.libs.json._
 import _root_.redis.clients.jedis._
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
+import support.EventStreamType
 
 object RedisEventStore {
   val DEFAULT_PORT = Protocol.DEFAULT_PORT
@@ -102,28 +103,28 @@ abstract class RedisEventStore[Event] protected (name: String, host: String, por
   override object reader extends CommitReader[Event] {
     override def storeRevision: StoreRevision = withJedis { jedis => StoreRevision(jedis.hlen(CommitsKey)) }
 
-    override def readCommits(since: StoreRevision, to: StoreRevision): Stream[Commit[Event]] = {
+    override def readCommits[E <: Event: Manifest](since: StoreRevision, to: StoreRevision): Stream[Commit[E]] = {
       val current = storeRevision
       if (since >= current) Stream.empty else {
         val revisionRange = (since.value + 1) to (to.value min current.value)
-        doReadCommits(revisionRange.map(_.toString))
+        doReadCommits(revisionRange.map(_.toString)).map(_.withOnlyEventsOfType[E])
       }
     }
 
-    override def streamRevision(streamId: String): StreamRevision = withJedis { jedis =>
-      StreamRevision(jedis.llen(keyForStream(streamId)))
+    override def streamRevision[Id, Event](streamId: Id)(implicit descriptor: EventStreamType[Id, Event]): StreamRevision = withJedis { jedis =>
+      StreamRevision(jedis.llen(keyForStream(descriptor.toString(streamId))))
     }
 
-    override def readStream(streamId: String, since: StreamRevision = StreamRevision.Initial, to: StreamRevision = StreamRevision.Maximum): Stream[Commit[Event]] = {
-      val commitIds = withJedis { _.lrange(keyForStream(streamId), since.value, to.value) }
-      doReadCommits(commitIds.asScala)
+    override def readStream[Id, E <: Event](streamId: Id, since: StreamRevision = StreamRevision.Initial, to: StreamRevision = StreamRevision.Maximum)(implicit descriptor: EventStreamType[Id, E]): Stream[Commit[E]] = {
+      val commitIds = withJedis { _.lrange(keyForStream(descriptor.toString(streamId)), since.value, to.value) }
+      doReadCommits(commitIds.asScala).map(commit => commit.copy(events = commit.events.map(descriptor.cast)))
     }
   }
 
   override object publisher extends CommitPublisher[Event] {
     import reader._
 
-    override def subscribe(since: StoreRevision)(listener: CommitListener[Event]): Subscription = {
+    override def subscribe[E <: Event: Manifest](since: StoreRevision)(listener: CommitListener[E]): Subscription = {
       @volatile var cancelled = false
       @volatile var last = since
       val unsubscribeToken = UUID.randomUUID.toString
@@ -160,7 +161,7 @@ abstract class RedisEventStore[Event] protected (name: String, host: String, por
                 Logger.warn("missing commits since " + last + " to " + commit.storeRevision + ", replaying...")
                 replayCommitsTo(commit.storeRevision)
               } else if (last.next == commit.storeRevision) {
-                listener(commit)
+                listener(commit.withOnlyEventsOfType[E])
                 last = commit.storeRevision
               } else {
                 Logger.warn("Ignoring old commit " + commit.storeRevision + ", since we already processed everything up to " + last)

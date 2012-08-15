@@ -1,7 +1,7 @@
 package models
 
 import events._
-import eventstore._
+import eventstore.StreamRevision
 import scala.collection.immutable.SortedMap
 
 /**
