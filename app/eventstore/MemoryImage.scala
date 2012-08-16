@@ -6,33 +6,33 @@ import support.ConflictsWith
 import support.EventStreamType
 
 /**
- * The transaction to commit to the event when modifying the memory image.
+ * The update to commit to the event when modifying the memory image.
  */
-sealed trait Transaction[+Event, +A] {
+sealed trait Update[+Event, +A] {
   /**
-   * Maps the result of this transaction from `A` to `B` using `f`.
+   * Maps the result of this update from `A` to `B` using `f`.
    */
-  def map[B](f: A => B): Transaction[Event, B]
+  def map[B](f: A => B): Update[Event, B]
 }
-object Transaction {
+object Update {
   /**
-   * Transaction result that will commit the  `changes` to the event store.
+   * Update result that will append the  `changes` to the event store upon commit.
    */
-  def commit[Id, Event, A](changes: Changes[Event])(onCommit: => A, onConflict: (StreamRevision, Seq[Event]) => A)(implicit descriptor: EventStreamType[Id, Event]): Transaction[Event, A] =
-    new TransactionCommit(changes, descriptor, () => onCommit, onConflict)
+  def append[Id, Event, A](changes: Changes[Event])(onCommit: => A, onConflict: (StreamRevision, Seq[Event]) => A)(implicit descriptor: EventStreamType[Id, Event]): Update[Event, A] =
+    new Append(changes, descriptor, () => onCommit, onConflict)
 
   /**
-   * Transaction result that simply returns `value` when run, without
-   * committing anything the event store.
+   * Update result that simply returns `value` when run, without committing
+   * anything the event store.
    */
-  def abort[A](value: => A): Transaction[Nothing, A] = new TransactionAbort(() => value)
+  def abort[A](value: => A): Update[Nothing, A] = new Abort(() => value)
 }
-private case class TransactionAbort[A](onAbort: () => A) extends Transaction[Nothing, A] {
-  override def map[B](f: A => B): Transaction[Nothing, B] = Transaction.abort(f(onAbort()))
+private case class Abort[A](onAbort: () => A) extends Update[Nothing, A] {
+  override def map[B](f: A => B): Update[Nothing, B] = Update.abort(f(onAbort()))
 }
-private case class TransactionCommit[Id, Event, A](changes: Changes[Event], descriptor: EventStreamType[Id, Event], onCommit: () => A, onConflict: (StreamRevision, Seq[Event]) => A) extends Transaction[Event, A] {
-  override def map[B](f: A => B): Transaction[Event, B] =
-    Transaction.commit(changes)(f(onCommit()), (actual, events) => f(onConflict(actual, events)))(descriptor)
+private case class Append[Id, Event, A](changes: Changes[Event], descriptor: EventStreamType[Id, Event], onCommit: () => A, onConflict: (StreamRevision, Seq[Event]) => A) extends Update[Event, A] {
+  override def map[B](f: A => B): Update[Event, B] =
+    Update.append(changes)(f(onCommit()), (actual, events) => f(onConflict(actual, events)))(descriptor)
 }
 
 /**
@@ -62,13 +62,13 @@ class MemoryImage[State, -Event: Manifest] private (eventStore: EventStore[Event
    * the produced event. The transaction is automatically retried when a write
    * conflict is detected, so the provided `body` must be side-effect free.
    */
-  def modify[A, E <: Event](body: State => Transaction[E, A])(implicit conflictsWith: ConflictsWith[E]): A = {
+  def modify[A, E <: Event](body: State => Update[E, A])(implicit conflictsWith: ConflictsWith[E]): A = {
     @tailrec def runTransaction(minimum: StoreRevision): A = {
       val (state, transactionRevision) = getWithRevisionAt(minimum)
       body(state) match {
-        case TransactionAbort(onAbort) =>
+        case Abort(onAbort) =>
           onAbort()
-        case TransactionCommit(changes, descriptor, onCommit, onConflict) =>
+        case Append(changes, descriptor, onCommit, onConflict) =>
           eventStore.committer.tryCommit(changes)(descriptor) match {
             case Right(commit) =>
               onCommit()

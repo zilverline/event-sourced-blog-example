@@ -1,8 +1,8 @@
 package eventstore
 
 import play.api.libs.json._
-import support.JsonMapping._
 import support.EventStreamType
+import support.JsonMapping._
 
 /**
  * The revision of an event store. The revision of an event store is
@@ -53,8 +53,8 @@ object StreamRevision {
 /**
  * Represents the changes that can be committed atomically to the event store.
  */
-case class Changes[+Event] private (streamKey: String, expected: StreamRevision, events: Seq[Event]) {
-  def streamId[Id, E >: Event](implicit descriptor: EventStreamType[Id, E]): Id = descriptor.fromString(streamKey)
+case class Changes[+Event] private (serializedStreamId: String, expected: StreamRevision, events: Seq[Event]) {
+  def streamId[Id, E >: Event](implicit descriptor: EventStreamType[Id, E]): Id = descriptor.fromString(serializedStreamId)
 }
 object Changes {
   def apply[Id, Event](streamId: Id, expected: StreamRevision, event: Event)(implicit descriptor: EventStreamType[Id, Event]): Changes[Event] = Changes(descriptor.toString(streamId), expected, Seq(event))
