@@ -20,7 +20,8 @@ trait RedisWatchMultiExecEventCommitter[Event] { this: RedisEventStore[Event] =>
 
     private[this] val lock = new Object
 
-    override def tryCommit[Id, E <: Event](changes: Changes[E])(implicit descriptor: EventStreamType[Id, E]): CommitResult[E] = {
+    override def tryCommit[E <: Event](changes: Changes[E]): CommitResult[E] = {
+      implicit val descriptor = changes.eventStreamType
       val backoff = new Backoff
       val streamId = descriptor.toString(changes.streamId)
       val streamKey = keyForStream(streamId)

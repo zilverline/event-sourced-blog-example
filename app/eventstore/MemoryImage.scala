@@ -69,7 +69,7 @@ class MemoryImage[State, -Event: Manifest] private (eventStore: EventStore[Event
         case Abort(onAbort) =>
           onAbort()
         case Append(changes, descriptor, onCommit, onConflict) =>
-          eventStore.committer.tryCommit(changes)(descriptor) match {
+          eventStore.committer.tryCommit(changes) match {
             case Right(commit) =>
               onCommit()
             case Left(conflict) =>
@@ -81,7 +81,7 @@ class MemoryImage[State, -Event: Manifest] private (eventStore: EventStore[Event
                 if (conflicting.nonEmpty) {
                   onConflict(conflict.actual, conflicting)
                 } else {
-                  eventStore.committer.tryCommit(changes.copy(expected = conflict.actual))(descriptor) match {
+                  eventStore.committer.tryCommit(changes.withExpected(conflict.actual)) match {
                     case Right(commit)  => onCommit()
                     case Left(conflict) => runTransaction(conflictRevision)
                   }

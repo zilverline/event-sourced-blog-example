@@ -46,9 +46,10 @@ class FakeEventStore[Event] extends EventStore[Event] {
   override object committer extends EventCommitter[Event] {
     import reader._
 
-    override def tryCommit[Id, E <: Event](changes: Changes[E])(implicit descriptor: EventStreamType[Id, E]): CommitResult[E] = {
+    override def tryCommit[E <: Event](changes: Changes[E]): CommitResult[E] = {
       require(Txn.findCurrent.isEmpty, "the fake event store cannot participate in an STM transaction, just like a real event store")
 
+      implicit val descriptor = changes.eventStreamType
       val streamId = descriptor.toString(changes.streamId)
 
       atomic { implicit txn =>

@@ -40,7 +40,8 @@ trait RedisLuaEventCommitter[Event] { this: RedisEventStore[Event] =>
   Logger.debug("Redis Lua TryCommitScript loaded with id " + TryCommitScriptId)
 
   object committer extends EventCommitter[Event] {
-    override def tryCommit[Id, E <: Event](changes: Changes[E])(implicit descriptor: EventStreamType[Id, E]): CommitResult[E] = {
+    override def tryCommit[E <: Event](changes: Changes[E]): CommitResult[E] = {
+      implicit val descriptor = changes.eventStreamType
       val timestamp = DateTimeUtils.currentTimeMillis
       val serializedEvents = Json.stringify(Json.toJson(changes.events: Seq[Event])(Writes.seqWrites(eventFormat)))
       val streamId = descriptor.toString(changes.streamId)
