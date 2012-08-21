@@ -18,8 +18,8 @@ object Transaction {
   /**
    * Transaction result that will commit the  `changes` to the event store.
    */
-  def commit[Id, Event, A](changes: Changes[Event])(onCommit: => A, onConflict: (StreamRevision, Seq[Event]) => A)(implicit descriptor: EventStreamType[Id, Event], conflictsWith: ConflictsWith[Event]): Transaction[Event, A] =
-    new TransactionCommit(changes, () => onCommit, onConflict, descriptor, conflictsWith)
+  def commit[Event, A](changes: Changes[Event])(onCommit: => A, onConflict: (StreamRevision, Seq[Event]) => A)(implicit conflictsWith: ConflictsWith[Event]): Transaction[Event, A] =
+    new TransactionCommit(changes, () => onCommit, onConflict, conflictsWith)
 
   /**
    * Transaction result that simply returns `value` when run, without
@@ -28,11 +28,11 @@ object Transaction {
   def abort[A](value: => A): Transaction[Nothing, A] = new TransactionAbort(() => value)
 }
 private case class TransactionAbort[A](onAbort: () => A) extends Transaction[Nothing, A] {
-  override def map[B](f: A => B): Transaction[Nothing, B] = Transaction.abort(f(onAbort()))
+  override def map[B](f: A => B): Transaction[Nothing, B] = TransactionAbort(() => f(onAbort()))
 }
-private case class TransactionCommit[Id, Event, A](changes: Changes[Event], onCommit: () => A, onConflict: (StreamRevision, Seq[Event]) => A, descriptor: EventStreamType[Id, Event], conflictsWith: ConflictsWith[Event]) extends Transaction[Event, A] {
+private case class TransactionCommit[Event, A](changes: Changes[Event], onCommit: () => A, onConflict: (StreamRevision, Seq[Event]) => A, conflictsWith: ConflictsWith[Event]) extends Transaction[Event, A] {
   override def map[B](f: A => B): Transaction[Event, B] =
-    Transaction.commit(changes)(f(onCommit()), (actual, events) => f(onConflict(actual, events)))(descriptor, conflictsWith)
+    TransactionCommit[Event, B](changes, () => f(onCommit()), (actual, events) => f(onConflict(actual, events)), conflictsWith)
 }
 
 /**
@@ -68,7 +68,7 @@ class MemoryImage[State, -Event: Manifest] private (eventStore: EventStore[Event
       body(state) match {
         case TransactionAbort(onAbort) =>
           onAbort()
-        case TransactionCommit(changes, onCommit, onConflict, descriptor, conflictsWith) =>
+        case TransactionCommit(changes, onCommit, onConflict, conflictsWith) =>
           eventStore.committer.tryCommit(changes) match {
             case Right(commit) =>
               onCommit()
@@ -81,7 +81,7 @@ class MemoryImage[State, -Event: Manifest] private (eventStore: EventStore[Event
                 if (conflicting.nonEmpty) {
                   onConflict(conflict.actual, conflicting)
                 } else {
-                  eventStore.committer.tryCommit(changes.withExpected(conflict.actual)) match {
+                  eventStore.committer.tryCommit(changes.withExpectedRevision(conflict.actual)) match {
                     case Right(commit)  => onCommit()
                     case Left(conflict) => runTransaction(conflictRevision)
                   }

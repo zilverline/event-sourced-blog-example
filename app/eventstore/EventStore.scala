@@ -56,23 +56,23 @@ object StreamRevision {
 sealed trait Changes[Event] {
   type Id
   def eventStreamType: EventStreamType[Id, Event]
+
   def streamId: Id
   def expected: StreamRevision
   def events: Seq[Event]
 
-  def withExpected(expected: StreamRevision): Changes[Event]
-}
-private[this] case class EventStreamChanges[A, Event](streamId: A, expected: StreamRevision, events: Seq[Event])(implicit descriptor: EventStreamType[A, Event]) extends Changes[Event] {
-  type Id = A
-  def eventStreamType = descriptor
-
-  override def withExpected(expected: StreamRevision) = copy(expected = expected)
+  def withExpectedRevision(expected: StreamRevision): Changes[Event]
 }
 object Changes {
-  def apply[Id, Event](streamId: Id, expected: StreamRevision, events: Event*)(implicit descriptor: EventStreamType[Id, Event]): Changes[Event] =
-    EventStreamChanges(streamId, expected, events)
-  def apply[Id, Event](expected: StreamRevision, event: Event)(implicit descriptor: EventStreamType[Id, Event]): Changes[Event] =
-    Changes(descriptor.streamId(event), expected, event)
+  def apply[Id, Event](streamId: Id, expected: StreamRevision, events: Event*)(implicit streamType: EventStreamType[Id, Event]): Changes[Event] =
+    EventStreamChanges(streamId, expected, events, streamType)
+  def apply[Id, Event](expected: StreamRevision, event: Event)(implicit streamType: EventStreamType[Id, Event]): Changes[Event] =
+    Changes(streamType.streamId(event), expected, event)
+}
+private[this] case class EventStreamChanges[A, Event](streamId: A, expected: StreamRevision, events: Seq[Event], eventStreamType: EventStreamType[A, Event]) extends Changes[Event] {
+  type Id = A
+
+  override def withExpectedRevision(expected: StreamRevision) = copy(expected = expected)
 }
 
 /**

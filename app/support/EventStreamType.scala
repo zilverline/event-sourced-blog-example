@@ -15,11 +15,6 @@ trait EventStreamType[Id, Event] {
   def toString(id: Id): String
 
   /**
-   * Parses a string back to a stream identifier.
-   */
-  def fromString(s: String): Id
-
-  /**
    * Cast `event` to the `Event` type.
    *
    * @throws ClassCastException if `event` is not of type `Event`.
@@ -27,12 +22,9 @@ trait EventStreamType[Id, Event] {
   def cast(event: Any): Event
 }
 object EventStreamType {
-  def apply[Id, Event](eventToStreamId: Event => Id, writeStreamId: Id => String, readStreamId: String => Option[Id])(implicit manifest: Manifest[Event]) = new EventStreamType[Id, Event] {
+  def apply[Id, Event](eventToStreamId: Event => Id, writeStreamId: Id => String)(implicit manifest: Manifest[Event]) = new EventStreamType[Id, Event] {
     def streamId(event: Event) = eventToStreamId(event)
     def toString(id: Id) = writeStreamId(id)
-    def fromString(s: String) = readStreamId(s).getOrElse {
-      throw new IllegalArgumentException("failed to parse stream identifier '" + s + "'")
-    }
 
     def cast(event: Any): Event = {
       if (manifest.erasure.isInstance(event)) event.asInstanceOf[Event]

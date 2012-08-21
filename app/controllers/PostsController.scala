@@ -18,8 +18,8 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
    */
   val postContentForm = Form(mapping(
     "author" -> trimmedText.verifying(minLength(3)),
-    "title" -> trimmedText.verifying(minLength(3)),
-    "body" -> trimmedText.verifying(minLength(3)))(PostContent.apply)(PostContent.unapply))
+    "title"  -> trimmedText.verifying(minLength(3)),
+    "body"   -> trimmedText.verifying(minLength(3)))(PostContent.apply)(PostContent.unapply))
 
   /**
    * Show an overview of the most recent blog posts.
@@ -99,7 +99,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
   object comments {
     val commentContentForm = Form(mapping(
       "commenter" -> trimmedText.verifying(minLength(3)),
-      "body" -> trimmedText.verifying(minLength(3)))(CommentContent.apply)(CommentContent.unapply))
+      "body"      -> trimmedText.verifying(minLength(3)))(CommentContent.apply)(CommentContent.unapply))
 
     def add(postId: PostId, expected: StreamRevision) = Action { implicit request =>
       updatePost(postId) { post =>
@@ -142,13 +142,11 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
    * Runs the transaction `body` against the post identified by `postId` and
    * returns the result, if it exists. Otherwise `None` is returned.
    */
-  private[this] def updatePost[A](id: PostId)(body: Post => Transaction[PostEvent, A]): Option[A] = {
+  private[this] def updatePost[A](id: PostId)(body: Post => Transaction[PostEvent, A]): Option[A] =
     memoryImage.modify { posts =>
-      posts.get(id).map { post =>
-        body(post).map(a => Some(a))
-      }.getOrElse {
-        Transaction.abort(None)
+      posts.get(id) match {
+        case Some(post) => body(post).map(a => Some(a))
+        case None       => Transaction.abort(None)
       }
     }
-  }
 }

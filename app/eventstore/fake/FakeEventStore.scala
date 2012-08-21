@@ -35,11 +35,11 @@ class FakeEventStore[Event] extends EventStore[Event] {
 
     override def streamRevision[Id, Event](streamId: Id)(implicit descriptor: EventStreamType[Id, Event]): StreamRevision = StreamRevision(streams().get(streamId).map(_.size.toLong).getOrElse(0L))
 
-    override def readStream[Id, E <: Event](streamId: Id, since: StreamRevision = StreamRevision.Initial, to: StreamRevision = StreamRevision.Maximum)(implicit descriptor: EventStreamType[Id, E]): Stream[Commit[E]] = {
+    override def readStream[Id, E <: Event](streamId: Id, since: StreamRevision = StreamRevision.Initial, to: StreamRevision = StreamRevision.Maximum)(implicit streamType: EventStreamType[Id, E]): Stream[Commit[E]] = {
       streams().getOrElse(streamId, Vector.empty).
         slice((since.value min Int.MaxValue).toInt, (to.value min Int.MaxValue).toInt).
         toStream.
-        map(commit => commit.copy(events = commit.events.map(descriptor.cast)))
+        map(commit => commit.copy(events = commit.events.map(streamType.cast)))
     }
   }
 
