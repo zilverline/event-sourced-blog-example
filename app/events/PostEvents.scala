@@ -3,10 +3,10 @@ package events
 import java.util.UUID
 import play.api.libs.json._
 import support.ConflictsWith
+import support.EventStreamType
 import support.Identifier
 import support.IdentifierCompanion
 import support.JsonMapping._
-import support.EventStreamType
 
 /**
  * Strongly typed identifiers for posts and comments.
@@ -44,13 +44,13 @@ case class CommentAdded(postId: PostId, commentId: CommentId, content: CommentCo
 case class CommentDeleted(postId: PostId, commentId: CommentId) extends PostCommentEvent
 
 object PostEvent {
-  implicit val PostEventStreamType: EventStreamType[PostId, PostEvent] = EventStreamType(_.postId, _.toString, PostId.fromString)
-
   implicit val PostEventConflictsWith: ConflictsWith[PostEvent] = ConflictsWith {
     case (a: PostCommentEvent, b: PostCommentEvent) => a.commentId == b.commentId
     case (_: PostCommentEvent, _)                   => false
     case _                                          => true
   }
+
+  implicit val PostEventStreamType: EventStreamType[PostId, PostEvent] = EventStreamType(_.postId, _.toString, PostId.fromString)
 
   implicit val PostContentFormat: Format[PostContent] = objectFormat("author", "title", "body")(PostContent.apply)(PostContent.unapply)
   implicit val CommentContentFormat: Format[CommentContent] = objectFormat("commenter", "body")(CommentContent.apply)(CommentContent.unapply)
