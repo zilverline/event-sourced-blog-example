@@ -51,7 +51,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
           BadRequest(views.html.posts.add(id, formWithErrors)),
         postContent =>
           memoryImage.modify { _ =>
-            Update.append(Changes(StreamRevision.Initial, PostAdded(id, postContent): PostEvent))(
+            Transaction.commit(Changes(StreamRevision.Initial, PostAdded(id, postContent): PostEvent))(
               onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post added."),
               onConflict = (actual, conflicts) => Conflict(views.html.posts.edit(id, actual, postContentForm.fill(postContent), conflicts)))
           })
@@ -72,9 +72,9 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
       updatePost(id) { post =>
         postContentForm.bindFromRequest.fold(
           formWithErrors =>
-            Update.abort(BadRequest(views.html.posts.edit(id, expected, formWithErrors))),
+            Transaction.abort(BadRequest(views.html.posts.edit(id, expected, formWithErrors))),
           postContent =>
-            Update.append(Changes(expected, PostEdited(id, postContent): PostEvent))(
+            Transaction.commit(Changes(expected, PostEdited(id, postContent): PostEvent))(
               onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post saved."): Result,
               onConflict = (actual, conflicts) => Conflict(views.html.posts.edit(id, actual, postContentForm.fill(postContent), conflicts))))
       } getOrElse notFound
@@ -87,7 +87,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
   def delete(id: PostId, expected: StreamRevision) = Action { implicit request =>
     def deletedResult = Redirect(routes.PostsController.index).flashing("info" -> "Post deleted.")
     updatePost(id) { post =>
-      Update.append(Changes(expected, PostDeleted(id): PostEvent))(
+      Transaction.commit(Changes(expected, PostDeleted(id): PostEvent))(
         onCommit = deletedResult,
         onConflict = (actual, conflicts) => Conflict(views.html.posts.index(posts().mostRecent(20), conflicts)))
     } getOrElse deletedResult
@@ -105,9 +105,9 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
       updatePost(postId) { post =>
         commentContentForm.bindFromRequest.fold(
           formWithErrors =>
-            Update.abort(BadRequest(views.html.posts.show(post, formWithErrors))),
+            Transaction.abort(BadRequest(views.html.posts.show(post, formWithErrors))),
           commentContent =>
-            Update.append(Changes(expected, CommentAdded(postId, post.nextCommentId, commentContent): PostEvent))(
+            Transaction.commit(Changes(expected, CommentAdded(postId, post.nextCommentId, commentContent): PostEvent))(
               onCommit = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment added."),
               onConflict = (actual, conflicts) => Conflict(views.html.posts.show(post, commentContentForm.fill(commentContent), conflicts))))
       } getOrElse notFound
@@ -118,9 +118,9 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
         def deletedResult = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment deleted.")
         post.comments.get(commentId) match {
           case None =>
-            Update.abort(deletedResult)
+            Transaction.abort(deletedResult)
           case Some(comment) =>
-            Update.append(Changes(expected, CommentDeleted(postId, commentId): PostEvent))(
+            Transaction.commit(Changes(expected, CommentDeleted(postId, commentId): PostEvent))(
               onCommit = deletedResult,
               onConflict = (actual, conflicts) => Conflict(views.html.posts.show(post, commentContentForm, conflicts)))
         }
@@ -139,15 +139,15 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
   private[this] def notFound(implicit request: Request[_]): Result = NotFound(views.html.defaultpages.notFound(request, None))
 
   /**
-   * Runs the Update `body` against the post identified by `postId` and
+   * Runs the transaction `body` against the post identified by `postId` and
    * returns the result, if it exists. Otherwise `None` is returned.
    */
-  private[this] def updatePost[A](id: PostId)(body: Post => Update[PostEvent, A]): Option[A] = {
+  private[this] def updatePost[A](id: PostId)(body: Post => Transaction[PostEvent, A]): Option[A] = {
     memoryImage.modify { posts =>
       posts.get(id).map { post =>
         body(post).map(a => Some(a))
       }.getOrElse {
-        Update.abort(None)
+        Transaction.abort(None)
       }
     }
   }

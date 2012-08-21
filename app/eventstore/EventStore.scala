@@ -1,8 +1,8 @@
 package eventstore
 
 import play.api.libs.json._
-import support.EventStreamType
 import support.JsonMapping._
+import support.EventStreamType
 
 /**
  * The revision of an event store. The revision of an event store is
