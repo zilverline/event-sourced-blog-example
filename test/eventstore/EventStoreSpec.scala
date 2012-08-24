@@ -120,12 +120,20 @@ class CommitSpec extends org.specs2.mutable.Specification with org.specs2.ScalaC
     "combine event with stream revision" in {
       ExampleCommit.eventsWithRevision must_== Seq(("Event1", StreamRevision(2)), ("Event2", StreamRevision(2)))
     }
+
+    "filter events based on type" in {
+      forAll { (commit: Commit[String]) => commit.withOnlyEventsOfType[String] must_== commit }
+      forAll { (commit: Commit[String]) => commit.withOnlyEventsOfType[Any]    must_== commit }
+      forAll { (commit: Commit[String]) => commit.withOnlyEventsOfType[UUID]   must_== commit.copy(events = Seq.empty) }
+    }
   }
 }
 
 trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
+  sequential
+
   val streamIdGenerator = Gen.wrap(UUID.randomUUID.toString)
-  implicit val sd: EventStreamType[String, String] = EventStreamType(identity, identity)
+  implicit val StringEventStreamType: EventStreamType[String, String] = EventStreamType(identity, identity)
 
   "An event store" should {
     val id = Gen.alphaStr.sample.get
@@ -155,7 +163,8 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
     "store commits" in new fixture {
       subject.committer.tryCommit(Changes("streamId", StreamRevision(0), "event"))
 
-      subject.reader.readStream("streamId")(sd) must_== Seq(Commit(StoreRevision(1), now, "streamId", StreamRevision(1), Seq("event")))
+      subject.reader.readStream("streamId") must_== Seq(Commit(StoreRevision(1), now, "streamId", StreamRevision(1), Seq("event")))
+      subject.reader.streamRevision("streamId") must_== StreamRevision(1)
     }
 
     "store commits in multiple streams" in new fixture {

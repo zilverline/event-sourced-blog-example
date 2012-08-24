@@ -3,6 +3,7 @@ package events
 import java.util.UUID
 import org.scalacheck._, Arbitrary.arbitrary, Prop.forAll
 import play.api.libs.json._
+import support.ConflictsWith
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
@@ -43,6 +44,30 @@ class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.Sc
       val json = """{"type":"PostAdded","data":{"postId":"5ab11526-477b-43b9-8fe6-4bb25a3dfcc6","content":{"author":"Author","title":"Title","body":"Body"}}}"""
 
       Json.fromJson[PostEvent](Json.parse(json)) must_== event
+    }
+  }
+
+  "Post comment event" should {
+    val postId = PostId.generate
+    val conflictsWith = implicitly[ConflictsWith[PostEvent]]
+    val commentAdded = CommentAdded(postId, CommentId(1), CommentContent("commenter", "body"))
+
+    "conflict with post comment with same id" in {
+      conflictsWith.conflicting(
+        Seq(commentAdded),
+        Seq(commentAdded)) must_== Seq(commentAdded)
+    }
+
+    "not conflict with committed post comment event" in {
+      conflictsWith.conflicting(
+        Seq(commentAdded),
+        Seq(PostDeleted(postId))) must beEmpty
+    }
+
+    "conflict with other post events" in {
+      conflictsWith.conflicting(
+        Seq(PostDeleted(postId)),
+        Seq(PostEdited(postId, PostContent(author = "Author", title = "Title", body = "Body")))) must_== Seq(PostDeleted(postId))
     }
   }
 }
