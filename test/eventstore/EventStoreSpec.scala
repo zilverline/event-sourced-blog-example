@@ -4,8 +4,8 @@ import java.util.UUID
 import java.util.concurrent.{ CountDownLatch, TimeUnit }
 import org.joda.time.DateTimeUtils
 import org.scalacheck._, Arbitrary.arbitrary, Prop.{ forAll, forAllNoShrink }
+import org.specs2.matcher.Matcher
 import play.api.libs.json._
-import EventStoreSpec._
 import support.EventStreamType
 
 object EventStoreSpec {
@@ -16,6 +16,7 @@ object EventStoreSpec {
 
   implicit def arbitraryCommit[Event: Arbitrary]: Arbitrary[Commit[Event]] = Arbitrary(Gen.resultOf(Commit.apply[Event] _))
 }
+import EventStoreSpec._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class StoreRevisionSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
@@ -130,10 +131,10 @@ class CommitSpec extends org.specs2.mutable.Specification with org.specs2.ScalaC
 }
 
 trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
-  sequential
-
   val streamIdGenerator = Gen.wrap(UUID.randomUUID.toString)
   implicit val StringEventStreamType: EventStreamType[String, String] = EventStreamType(identity, identity)
+
+  def matchCommit[A] = (be_==(_: Commit[A])) ^^^ ((_:Commit[A]).copy(timestamp = 0))
 
   "An event store" should {
     val id = Gen.alphaStr.sample.get
@@ -144,7 +145,9 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
     "commit initial event to stream" in new fixture {
       val result = subject.committer.tryCommit(Changes(id, StreamRevision.Initial, event))
 
-      result must_== Right(Commit(StoreRevision(1), now, id, StreamRevision(1), Seq(event)))
+      result must beRight
+      result.right.get must matchCommit(Commit(StoreRevision(1), now, id, StreamRevision(1), Seq(event)))
+
       subject.reader.storeRevision must_== StoreRevision.Initial.next
     }
 
@@ -157,14 +160,19 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
       result.left.get.streamId must_== id
       result.left.get.actual must_== StreamRevision.Initial.next
       result.left.get.expected must_== StreamRevision.Initial
-      result.left.get.commits must_== Seq(Commit(StoreRevision(1), now, id, StreamRevision(1), Seq(event1)))
+      result.left.get.commits must have size (1)
+      val commit = result.left.get.commits(0)
+      commit.timestamp must be >= now
+      commit must matchCommit(Commit(StoreRevision(1), now, id, StreamRevision(1), Seq(event1)))
     }
 
     "store commits" in new fixture {
       subject.committer.tryCommit(Changes("streamId", StreamRevision(0), "event"))
 
-      subject.reader.readStream("streamId") must_== Seq(Commit(StoreRevision(1), now, "streamId", StreamRevision(1), Seq("event")))
       subject.reader.streamRevision("streamId") must_== StreamRevision(1)
+      val commits = subject.reader.readStream("streamId")
+      commits must have size(1)
+      commits(0) must matchCommit(Commit(StoreRevision(1), now, "streamId", StreamRevision(1), Seq("event")))
     }
 
     "store commits in multiple streams" in new fixture {
@@ -184,7 +192,7 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
       subject.committer.tryCommit(Changes(id, StreamRevision.Initial, event1))
       subject.committer.tryCommit(Changes(id, StreamRevision.Initial, event2))
 
-      subject.reader.readStream(id) must_== Seq(Commit(StoreRevision(1), now, id, StreamRevision(1), Seq(event1)))
+      subject.reader.streamRevision(id) must_== StreamRevision(1)
     }
 
     "notify subscriber of commits" in new fixture {
@@ -233,7 +241,6 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
 
   trait fixture extends org.specs2.mutable.After {
     val now = DateTimeUtils.currentTimeMillis
-    DateTimeUtils.setCurrentMillisFixed(now)
 
     val subject = makeEmptyEventStore
 
@@ -244,7 +251,6 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
     }
 
     def after {
-      DateTimeUtils.setCurrentMillisSystem
       subject.close
     }
   }
