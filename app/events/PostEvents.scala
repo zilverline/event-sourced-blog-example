@@ -50,7 +50,7 @@ object PostEvent {
     case _                                          => true
   }
 
-  implicit val PostEventStreamType: EventStreamType[PostId, PostEvent] = EventStreamType(_.postId, _.toString)
+  implicit val PostEventStreamType: EventStreamType[PostId, PostEvent] = EventStreamType(_.toString, _.postId)
 
   implicit val PostContentFormat: Format[PostContent] = objectFormat("author", "title", "body")(PostContent.apply)(PostContent.unapply)
   implicit val CommentContentFormat: Format[CommentContent] = objectFormat("commenter", "body")(CommentContent.apply)(CommentContent.unapply)

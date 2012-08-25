@@ -75,7 +75,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
             Transaction.abort(BadRequest(views.html.posts.edit(id, expected, formWithErrors))),
           postContent =>
             Transaction.commit(Changes(expected, PostEdited(id, postContent): PostEvent))(
-              onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post saved."): Result,
+              onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post saved."),
               onConflict = (actual, conflicts) => Conflict(views.html.posts.edit(id, actual, postContentForm.fill(postContent), conflicts))))
       } getOrElse notFound
     }

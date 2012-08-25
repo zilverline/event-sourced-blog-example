@@ -22,10 +22,10 @@ object Transaction {
     new TransactionCommit(changes, () => onCommit, onConflict, conflictsWith)
 
   /**
-   * Transaction result that simply returns `value` when run, without
-   * committing anything the event store.
+   * Transaction result that completes with `onAbort` when run,
+   * without committing anything the event store.
    */
-  def abort[A](value: => A): Transaction[Nothing, A] = new TransactionAbort(() => value)
+  def abort[A](onAbort: => A): Transaction[Nothing, A] = new TransactionAbort(() => onAbort)
 }
 private case class TransactionAbort[A](onAbort: () => A) extends Transaction[Nothing, A] {
   override def map[B](f: A => B): Transaction[Nothing, B] = TransactionAbort(() => f(onAbort()))
@@ -83,7 +83,7 @@ class MemoryImage[State, -Event: Manifest] private (eventStore: EventStore[Event
                 } else {
                   eventStore.committer.tryCommit(changes.withExpectedRevision(conflict.actual)) match {
                     case Right(commit)  => onCommit()
-                    case Left(conflict) => runTransaction(conflictRevision)
+                    case Left(conflict) => runTransaction(conflict.commits.last.storeRevision)
                   }
                 }
               }

@@ -13,10 +13,10 @@ trait ConflictsWith[-Event] {
 }
 object ConflictsWith {
   /**
-   * Builds a new `ConflictsWith` based on the given predicate.
+   * Builds a new `ConflictsWith` based on the `conflicts` predicate.
    */
-  def apply[Event](predicate: (Event, Event) => Boolean) = new ConflictsWith[Event] {
+  def apply[Event](conflicts: (Event, Event) => Boolean) = new ConflictsWith[Event] {
     override def conflicting[A <: Event, B <: Event](committed: Seq[A], attempted: Seq[B]): Seq[A] =
-      committed.filter(a => attempted.exists(b => predicate(a, b)))
+      committed.filter(a => attempted.exists(b => conflicts(a, b)))
   }
 }

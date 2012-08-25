@@ -54,23 +54,23 @@ object StreamRevision {
  * Represents the changes that can be committed atomically to the event store.
  */
 sealed trait Changes[Event] {
-  type Id
-  def eventStreamType: EventStreamType[Id, Event]
+  type StreamId
+  def eventStreamType: EventStreamType[StreamId, Event]
 
-  def streamId: Id
+  def streamId: StreamId
   def expected: StreamRevision
   def events: Seq[Event]
 
   def withExpectedRevision(expected: StreamRevision): Changes[Event]
 }
 object Changes {
-  def apply[Id, Event](streamId: Id, expected: StreamRevision, events: Event*)(implicit streamType: EventStreamType[Id, Event]): Changes[Event] =
-    EventStreamChanges(streamId, expected, events, streamType)
-  def apply[Id, Event](expected: StreamRevision, event: Event)(implicit streamType: EventStreamType[Id, Event]): Changes[Event] =
-    Changes(streamType.streamId(event), expected, event)
+  def apply[StreamId, Event](streamId: StreamId, expected: StreamRevision, events: Event*)(implicit streamType: EventStreamType[StreamId, Event]): Changes[Event] =
+    new EventStreamChanges(streamId, expected, events, streamType)
+  def apply[StreamId, Event](expected: StreamRevision, event: Event)(implicit streamType: EventStreamType[StreamId, Event]): Changes[Event] =
+    apply(streamType.streamId(event), expected, event)
 }
 private[this] case class EventStreamChanges[A, Event](streamId: A, expected: StreamRevision, events: Seq[Event], eventStreamType: EventStreamType[A, Event]) extends Changes[Event] {
-  type Id = A
+  type StreamId = A
 
   override def withExpectedRevision(expected: StreamRevision) = copy(expected = expected)
 }
@@ -106,10 +106,27 @@ case class Conflict[+Event](commits: Seq[Commit[Event]]) {
  * Reads commits from the event store.
  */
 trait CommitReader[-Event] {
+  /**
+   * The current store revision.
+   */
   def storeRevision: StoreRevision
+
+  /**
+   * Reads all commits `since` (exclusive) up `to` (inclusive). Events are filtered by the expected event type `E`.
+   */
   def readCommits[E <: Event: Manifest](since: StoreRevision, to: StoreRevision): Stream[Commit[E]]
-  def streamRevision[Id, Event](streamId: Id)(implicit descriptor: EventStreamType[Id, Event]): StreamRevision
-  def readStream[Id, E <: Event](streamId: Id, since: StreamRevision = StreamRevision.Initial, to: StreamRevision = StreamRevision.Maximum)(implicit descriptor: EventStreamType[Id, E]): Stream[Commit[E]]
+
+  /**
+   * The current stream revision of the stream identified by `streamId`.
+   */
+  def streamRevision[StreamId, Event](streamId: StreamId)(implicit descriptor: EventStreamType[StreamId, Event]): StreamRevision
+
+  /**
+   * Reads all commits from the stream identified by `streamId` that occurred `since` (exclusive) up `to` (inclusive).
+   *
+   * @throws ClassCastException the stream contained commits that did not have the correct type `E`.
+   */
+  def readStream[StreamId, E <: Event](streamId: StreamId, since: StreamRevision = StreamRevision.Initial, to: StreamRevision = StreamRevision.Maximum)(implicit descriptor: EventStreamType[StreamId, E]): Stream[Commit[E]]
 }
 
 /**

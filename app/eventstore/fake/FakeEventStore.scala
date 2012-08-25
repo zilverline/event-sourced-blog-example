@@ -8,7 +8,7 @@ import scala.concurrent.stm._
 import support.EventStreamType
 
 object FakeEventStore {
-  def fromHistory[Id, Event](events: Seq[Event])(implicit descriptor: EventStreamType[Id, Event]): FakeEventStore[Event] = {
+  def fromHistory[StreamId, Event](events: Seq[Event])(implicit descriptor: EventStreamType[StreamId, Event]): FakeEventStore[Event] = {
     val result = new FakeEventStore[Event]
     for (event <- events) {
       val expected = result.reader.streamRevision(descriptor.streamId(event))
@@ -33,9 +33,9 @@ class FakeEventStore[Event] extends EventStore[Event] {
       commits().slice((since.value min Int.MaxValue).toInt, (to.value min Int.MaxValue).toInt).toStream.map(_.withOnlyEventsOfType[E])
     }
 
-    override def streamRevision[Id, Event](streamId: Id)(implicit descriptor: EventStreamType[Id, Event]): StreamRevision = StreamRevision(streams().get(streamId).map(_.size.toLong).getOrElse(0L))
+    override def streamRevision[StreamId, Event](streamId: StreamId)(implicit descriptor: EventStreamType[StreamId, Event]): StreamRevision = StreamRevision(streams().get(streamId).map(_.size.toLong).getOrElse(0L))
 
-    override def readStream[Id, E <: Event](streamId: Id, since: StreamRevision = StreamRevision.Initial, to: StreamRevision = StreamRevision.Maximum)(implicit streamType: EventStreamType[Id, E]): Stream[Commit[E]] = {
+    override def readStream[StreamId, E <: Event](streamId: StreamId, since: StreamRevision = StreamRevision.Initial, to: StreamRevision = StreamRevision.Maximum)(implicit streamType: EventStreamType[StreamId, E]): Stream[Commit[E]] = {
       streams().getOrElse(streamId, Vector.empty).
         slice((since.value min Int.MaxValue).toInt, (to.value min Int.MaxValue).toInt).
         toStream.

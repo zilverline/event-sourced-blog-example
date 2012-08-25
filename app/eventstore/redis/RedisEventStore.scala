@@ -111,11 +111,11 @@ abstract class RedisEventStore[Event] protected (name: String, host: String, por
       }
     }
 
-    override def streamRevision[Id, Event](streamId: Id)(implicit descriptor: EventStreamType[Id, Event]): StreamRevision = withJedis { jedis =>
+    override def streamRevision[StreamId, Event](streamId: StreamId)(implicit descriptor: EventStreamType[StreamId, Event]): StreamRevision = withJedis { jedis =>
       StreamRevision(jedis.llen(keyForStream(descriptor.toString(streamId))))
     }
 
-    override def readStream[Id, E <: Event](streamId: Id, since: StreamRevision = StreamRevision.Initial, to: StreamRevision = StreamRevision.Maximum)(implicit descriptor: EventStreamType[Id, E]): Stream[Commit[E]] = {
+    override def readStream[StreamId, E <: Event](streamId: StreamId, since: StreamRevision = StreamRevision.Initial, to: StreamRevision = StreamRevision.Maximum)(implicit descriptor: EventStreamType[StreamId, E]): Stream[Commit[E]] = {
       val commitIds = withJedis { _.lrange(keyForStream(descriptor.toString(streamId)), since.value, to.value) }
       doReadCommits(commitIds.asScala).map(commit => commit.copy(events = commit.events.map(descriptor.cast)))
     }
