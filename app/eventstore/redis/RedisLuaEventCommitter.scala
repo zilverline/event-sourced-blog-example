@@ -54,7 +54,7 @@ trait RedisLuaEventCommitter[Event] { this: RedisEventStore[Event] =>
         response.asInstanceOf[java.util.List[_]].asScala match {
           case Seq("conflict", actual: String) =>
             val conflicting = reader.readStream(changes.streamId, since = changes.expected)
-            Left(Conflict(conflicting))
+            Left(Conflict(conflicting.flatMap(_.committedEvents)))
           case Seq("commit", storeRevision: String) =>
             Right(Commit(StoreRevision(storeRevision.toLong), timestamp, streamId, changes.expected.next, changes.events))
         }

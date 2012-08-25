@@ -158,12 +158,12 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
 
       result must beLeft
       result.left.get.streamId must_== id
-      result.left.get.actual must_== StreamRevision.Initial.next
-      result.left.get.expected must_== StreamRevision.Initial
-      result.left.get.commits must have size (1)
-      val commit = result.left.get.commits(0)
+      result.left.get.actual must_== StreamRevision(1)
+      result.left.get.events must have size (1)
+      val commit = result.left.get.committedEvents(0)
       commit.timestamp must be >= now
-      commit must matchCommit(Commit(StoreRevision(1), now, id, StreamRevision(1), Seq(event1)))
+      commit.storeRevision must_== StoreRevision(1)
+      commit.event must_== event1
     }
 
     "store commits" in new fixture {

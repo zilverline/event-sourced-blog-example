@@ -57,7 +57,7 @@ class FakeEventStore[Event] extends EventStore[Event] {
 
         if (changes.expected < actual) {
           val conflicting = readStream(changes.streamId, since = changes.expected)
-          Left(Conflict(conflicting))
+          Left(Conflict(conflicting.flatMap(_.committedEvents)))
         } else if (changes.expected > actual) {
           throw new IllegalArgumentException("expected revision %d greater than actual revision %d" format (changes.expected.value, actual.value))
         } else {

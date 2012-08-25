@@ -18,7 +18,7 @@ object Transaction {
   /**
    * Transaction result that will commit the  `changes` to the event store.
    */
-  def commit[Event, A](changes: Changes[Event])(onCommit: => A, onConflict: (StreamRevision, Seq[Event]) => A)(implicit conflictsWith: ConflictsWith[Event]): Transaction[Event, A] =
+  def commit[Event, A](changes: Changes[Event])(onCommit: => A, onConflict: Conflict[Event] => A)(implicit conflictsWith: ConflictsWith[Event]): Transaction[Event, A] =
     new TransactionCommit(changes, () => onCommit, onConflict, conflictsWith)
 
   /**
@@ -30,9 +30,9 @@ object Transaction {
 private case class TransactionAbort[A](onAbort: () => A) extends Transaction[Nothing, A] {
   override def map[B](f: A => B): Transaction[Nothing, B] = TransactionAbort(() => f(onAbort()))
 }
-private case class TransactionCommit[Event, A](changes: Changes[Event], onCommit: () => A, onConflict: (StreamRevision, Seq[Event]) => A, conflictsWith: ConflictsWith[Event]) extends Transaction[Event, A] {
+private case class TransactionCommit[Event, A](changes: Changes[Event], onCommit: () => A, onConflict: Conflict[Event] => A, conflictsWith: ConflictsWith[Event]) extends Transaction[Event, A] {
   override def map[B](f: A => B): Transaction[Event, B] =
-    TransactionCommit[Event, B](changes, () => f(onCommit()), (actual, events) => f(onConflict(actual, events)), conflictsWith)
+    TransactionCommit[Event, B](changes, () => f(onCommit()), conflict => f(onConflict(conflict)), conflictsWith)
 }
 
 /**
@@ -73,18 +73,18 @@ class MemoryImage[State, -Event: Manifest] private (eventStore: EventStore[Event
             case Right(commit) =>
               onCommit()
             case Left(conflict) =>
-              val conflictRevision = conflict.commits.last.storeRevision
+              val conflictRevision = conflict.lastStoreRevision
               if (transactionRevision < conflictRevision) {
                 runTransaction(conflictRevision)
               } else {
-                val conflicting = conflictsWith.conflicting(conflict.events, changes.events)
-                if (conflicting.nonEmpty) {
-                  onConflict(conflict.actual, conflicting)
-                } else {
-                  eventStore.committer.tryCommit(changes.withExpectedRevision(conflict.actual)) match {
-                    case Right(commit)  => onCommit()
-                    case Left(conflict) => runTransaction(conflict.commits.last.storeRevision)
-                  }
+                conflictsWith.conflicting(conflict, changes.events) match {
+                  case Some(conflict) =>
+                    onConflict(conflict)
+                  case None =>
+                    eventStore.committer.tryCommit(changes.withExpectedRevision(conflict.actual)) match {
+                      case Right(commit)  => onCommit()
+                      case Left(conflict) => runTransaction(conflict.lastStoreRevision)
+                    }
                 }
               }
           }

@@ -50,7 +50,7 @@ trait RedisWatchMultiExecEventCommitter[Event] { this: RedisEventStore[Event] =>
 
       result.left.map { actual =>
         val conflicting = readStream(changes.streamId, since = changes.expected)
-        Conflict(conflicting)
+        Conflict(conflicting.flatMap(_.committedEvents))
       }
     }
 

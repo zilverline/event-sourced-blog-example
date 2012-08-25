@@ -53,7 +53,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
           memoryImage.modify { _ =>
             Transaction.commit(Changes(StreamRevision.Initial, PostAdded(id, postContent): PostEvent))(
               onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post added."),
-              onConflict = (actual, conflicts) => Conflict(views.html.posts.edit(id, actual, postContentForm.fill(postContent), conflicts)))
+              onConflict = conflict => Conflict(views.html.posts.edit(id, conflict.actual, postContentForm.fill(postContent), conflict.events)))
           })
     }
   }
@@ -76,7 +76,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
           postContent =>
             Transaction.commit(Changes(expected, PostEdited(id, postContent): PostEvent))(
               onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post saved."),
-              onConflict = (actual, conflicts) => Conflict(views.html.posts.edit(id, actual, postContentForm.fill(postContent), conflicts))))
+              onConflict = conflict => Conflict(views.html.posts.edit(id, conflict.actual, postContentForm.fill(postContent), conflict.events))))
       } getOrElse notFound
     }
   }
@@ -89,7 +89,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
     updatePost(id) { post =>
       Transaction.commit(Changes(expected, PostDeleted(id): PostEvent))(
         onCommit = deletedResult,
-        onConflict = (actual, conflicts) => Conflict(views.html.posts.index(posts().mostRecent(20), conflicts)))
+        onConflict = conflict => Conflict(views.html.posts.index(posts().mostRecent(20), conflict.events)))
     } getOrElse deletedResult
   }
 
@@ -109,7 +109,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
           commentContent =>
             Transaction.commit(Changes(expected, CommentAdded(postId, post.nextCommentId, commentContent): PostEvent))(
               onCommit = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment added."),
-              onConflict = (actual, conflicts) => Conflict(views.html.posts.show(post, commentContentForm.fill(commentContent), conflicts))))
+              onConflict = conflict => Conflict(views.html.posts.show(post, commentContentForm.fill(commentContent), conflict.events))))
       } getOrElse notFound
     }
 
@@ -122,7 +122,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
           case Some(comment) =>
             Transaction.commit(Changes(expected, CommentDeleted(postId, commentId): PostEvent))(
               onCommit = deletedResult,
-              onConflict = (actual, conflicts) => Conflict(views.html.posts.show(post, commentContentForm, conflicts)))
+              onConflict = conflict => Conflict(views.html.posts.show(post, commentContentForm, conflict.events)))
         }
       } getOrElse notFound
     }

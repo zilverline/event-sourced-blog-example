@@ -23,7 +23,7 @@ class MemoryImageSpec extends org.specs2.mutable.Specification with org.specs2.S
       subject.modify { state =>
         Transaction.commit(Changes("id", StreamRevision.Initial, "event"))(
           onCommit = success,
-          onConflict = (_, _) => failure("commit failed"))
+          onConflict = _ => failure("commit failed"))
       }
       eventStore.reader.readStream("id").flatMap(_.events) must_== Seq("event")
     }
@@ -34,9 +34,9 @@ class MemoryImageSpec extends org.specs2.mutable.Specification with org.specs2.S
       subject.modify { state =>
         Transaction.commit(Changes("id", StreamRevision.Initial, "event2"))(
           onCommit = failure("conflict expected"),
-          onConflict = { (actual, conflicting) =>
-            actual must_== StreamRevision(1)
-            conflicting must_== Seq("event1")
+          onConflict = { conflict =>
+            conflict.actual must_== StreamRevision(1)
+            conflict.events must_== Seq("event1")
           })
       }
 
@@ -49,7 +49,7 @@ class MemoryImageSpec extends org.specs2.mutable.Specification with org.specs2.S
       subject.modify { state =>
         Transaction.commit(Changes("id", StreamRevision.Initial, "event"))(
           onCommit = success,
-          onConflict = (_, _) => failure("commit failed"))
+          onConflict = _ => failure("commit failed"))
       }
 
       eventStore.reader.readStream("id").flatMap(_.events) must_== Seq("event", "event")
@@ -63,14 +63,14 @@ class MemoryImageSpec extends org.specs2.mutable.Specification with org.specs2.S
           latch.await(5, TimeUnit.SECONDS)
           Transaction.commit(Changes("id", StreamRevision(state.size), state.size.toString))(
             onCommit = success,
-            onConflict = (_, _) => failure("commit failed"))
+            onConflict = _ => failure("commit failed"))
         }
       }
 
       subject.modify { state =>
         Transaction.commit(Changes("id", StreamRevision.Initial, state.size.toString))(
           onCommit = success,
-          onConflict = (_, _) => failure("commit failed"))
+          onConflict = _ => failure("commit failed"))
       }
 
       latch.countDown()

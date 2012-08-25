@@ -84,22 +84,36 @@ case class Commit[+Event](storeRevision: StoreRevision, timestamp: Long, streamI
   def withOnlyEventsOfType[E](implicit manifest: Manifest[E]): Commit[E] = copy(events = events.collect {
     case event if manifest.erasure.isInstance(event) => event.asInstanceOf[E]
   })
+
+  def committedEvents: Seq[CommittedEvent[Event]] = events.map { event =>
+    CommittedEvent(storeRevision, timestamp, streamId, streamRevision, event)
+  }
 }
 object Commit {
   implicit def CommitFormat[Event: Format]: Format[Commit[Event]] = objectFormat("storeRevision", "timestamp", "streamId", "streamRevision", "events")(apply[Event] _)(unapply)
 }
 
 /**
+ * An event together with its commit related information.
+ */
+case class CommittedEvent[+Event](storeRevision: StoreRevision, timestamp: Long, streamId: String, streamRevision: StreamRevision, event: Event)
+
+/**
  * The conflict that occurred while trying to commit to `streamId`.
  */
-case class Conflict[+Event](commits: Seq[Commit[Event]]) {
-  require(commits.nonEmpty, "commits.nonEmpty")
-  require(actual > expected, "actual > expected")
+case class Conflict[+Event](committedEvents: Seq[CommittedEvent[Event]]) {
+  require(committedEvents.nonEmpty, "committedEvents.nonEmpty")
 
-  def streamId = commits.head.streamId
-  def actual = commits.last.streamRevision
-  def expected = commits.head.streamRevision.previous
-  def events: Seq[Event] = commits.flatMap(_.events)
+  def streamId = committedEvents.head.streamId
+  def actual = committedEvents.last.streamRevision
+  def events = committedEvents.map(_.event)
+
+  def lastStoreRevision = committedEvents.last.storeRevision
+
+  def filter(predicate: CommittedEvent[Event] => Boolean): Option[Conflict[Event]] = {
+    val filtered = committedEvents.filter(predicate)
+    if (filtered.isEmpty) None else Some(Conflict(filtered))
+  }
 }
 
 /**
