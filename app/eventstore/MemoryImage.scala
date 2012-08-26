@@ -16,16 +16,30 @@ sealed trait Transaction[+Event, +A] {
 }
 object Transaction {
   /**
-   * Transaction result that will commit the  `changes` to the event store.
-   */
-  def commit[Event, A](changes: Changes[Event])(onCommit: => A, onConflict: Conflict[Event] => A)(implicit conflictsWith: ConflictsWith[Event]): Transaction[Event, A] =
-    new TransactionCommit(changes, () => onCommit, onConflict, conflictsWith)
-
-  /**
    * Transaction result that completes with `onAbort` when run,
    * without committing anything the event store.
    */
   def abort[A](onAbort: => A): Transaction[Nothing, A] = new TransactionAbort(() => onAbort)
+
+  implicit def ChangesOps[Event](changes: Changes[Event]) = new ChangesOps(changes)
+  class ChangesOps[Event](changes: Changes[Event]) {
+    /**
+     * Transaction result that will commit the  `changes` to the event store.
+     */
+    def commit[A](onCommit: => A, onConflict: Conflict[Event] => A)(implicit conflictsWith: ConflictsWith[Event]): Transaction[Event, A] =
+      new TransactionCommit(changes, () => onCommit, onConflict, conflictsWith)
+  }
+
+  implicit def OptionTransactionOps[Event, A](m: Option[Transaction[Event, A]]) = new OptionTransactionOps(m)
+  class OptionTransactionOps[Event, A](value: Option[Transaction[Event, A]]) {
+    /**
+     * Turns an `Option[Transaction[Event, A]]` into `Transaction[Event, Option[A]]`.
+     */
+    def sequence: Transaction[Event, Option[A]] = value match {
+      case None              => abort(None)
+      case Some(transaction) => transaction.map(Some(_))
+    }
+  }
 }
 private case class TransactionAbort[A](onAbort: () => A) extends Transaction[Nothing, A] {
   override def map[B](f: A => B): Transaction[Nothing, B] = TransactionAbort(() => f(onAbort()))

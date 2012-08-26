@@ -126,9 +126,10 @@ trait CommitReader[-Event] {
   def storeRevision: StoreRevision
 
   /**
-   * Reads all commits `since` (exclusive) up `to` (inclusive). Events are filtered by the expected event type `E`.
+   * Reads all commits `since` (exclusive) up `to` (inclusive). Events are
+   * filtered to only include events of type `E`.
    */
-  def readCommits[E <: Event: Manifest](since: StoreRevision, to: StoreRevision): Stream[Commit[E]]
+  def readCommits[E <: Event](since: StoreRevision, to: StoreRevision)(implicit manifest: Manifest[E]): Stream[Commit[E]]
 
   /**
    * The current stream revision of the stream identified by `streamId`.
@@ -136,9 +137,11 @@ trait CommitReader[-Event] {
   def streamRevision[StreamId, Event](streamId: StreamId)(implicit descriptor: EventStreamType[StreamId, Event]): StreamRevision
 
   /**
-   * Reads all commits from the stream identified by `streamId` that occurred `since` (exclusive) up `to` (inclusive).
+   * Reads all commits from the stream identified by `streamId` that occurred
+   * `since` (exclusive) up `to` (inclusive).
    *
-   * @throws ClassCastException the stream contained commits that did not have the correct type `E`.
+   * @throws ClassCastException the stream contained commits that did not have
+   *         the correct type `E`.
    */
   def readStream[StreamId, E <: Event](streamId: StreamId, since: StreamRevision = StreamRevision.Initial, to: StreamRevision = StreamRevision.Maximum)(implicit descriptor: EventStreamType[StreamId, E]): Stream[Commit[E]]
 }

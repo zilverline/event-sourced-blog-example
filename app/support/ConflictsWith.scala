@@ -9,7 +9,7 @@ import eventstore.Conflict
 trait ConflictsWith[-Event] {
   /**
    * Checks each committed event from `conflict` for conflicts with the `attempted` events.
-   * Any committed event that conflicts is returned.
+   * Any committed events that conflict are returned.
    */
   def conflicting[A <: Event, B <: Event](conflict: Conflict[A], attempted: Seq[B]): Option[Conflict[A]]
 }

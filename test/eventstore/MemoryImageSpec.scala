@@ -4,6 +4,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import support.ConflictsWith
 import support.EventStreamType
+import Transaction._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class MemoryImageSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
@@ -21,7 +22,7 @@ class MemoryImageSpec extends org.specs2.mutable.Specification with org.specs2.S
 
     "commit modifications to event store" in new fixture {
       subject.modify { state =>
-        Transaction.commit(Changes("id", StreamRevision.Initial, "event"))(
+        Changes("id", StreamRevision.Initial, "event").commit(
           onCommit = success,
           onConflict = _ => failure("commit failed"))
       }
@@ -32,7 +33,7 @@ class MemoryImageSpec extends org.specs2.mutable.Specification with org.specs2.S
       eventStore.committer.tryCommit(Changes("id", StreamRevision.Initial, "event1")) must beRight
 
       subject.modify { state =>
-        Transaction.commit(Changes("id", StreamRevision.Initial, "event2"))(
+        Changes("id", StreamRevision.Initial, "event2").commit(
           onCommit = failure("conflict expected"),
           onConflict = { conflict =>
             conflict.actual must_== StreamRevision(1)
@@ -47,7 +48,7 @@ class MemoryImageSpec extends org.specs2.mutable.Specification with org.specs2.S
       eventStore.committer.tryCommit(Changes("id", StreamRevision.Initial, "event")) must beRight
 
       subject.modify { state =>
-        Transaction.commit(Changes("id", StreamRevision.Initial, "event"))(
+        Changes("id", StreamRevision.Initial, "event").commit(
           onCommit = success,
           onConflict = _ => failure("commit failed"))
       }
@@ -61,14 +62,14 @@ class MemoryImageSpec extends org.specs2.mutable.Specification with org.specs2.S
       val first = concurrent.ops.future {
         subject.modify { state =>
           latch.await(5, TimeUnit.SECONDS)
-          Transaction.commit(Changes("id", StreamRevision(state.size), state.size.toString))(
+          Changes("id", StreamRevision(state.size), state.size.toString).commit(
             onCommit = success,
             onConflict = _ => failure("commit failed"))
         }
       }
 
       subject.modify { state =>
-        Transaction.commit(Changes("id", StreamRevision.Initial, state.size.toString))(
+        Changes("id", StreamRevision.Initial, state.size.toString).commit(
           onCommit = success,
           onConflict = _ => failure("commit failed"))
       }
@@ -80,9 +81,7 @@ class MemoryImageSpec extends org.specs2.mutable.Specification with org.specs2.S
     }
 
     "not commit on abort" in new fixture {
-      subject.modify { state =>
-        Transaction.abort(success)
-      }
+      subject.modify { state => abort(success) }
 
       eventStore.reader.storeRevision must_== StoreRevision.Initial
     }
