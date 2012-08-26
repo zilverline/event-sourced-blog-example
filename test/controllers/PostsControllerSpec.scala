@@ -15,7 +15,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
 
   "posts controller" should {
     "list posts" in new fixture {
-      memoryImage.tryCommit(postId.toString, StreamRevision.Initial, PostAdded(postId, postContent)) must beRight
+      eventStore.committer.tryCommit(Changes(StreamRevision.Initial, PostAdded(postId, postContent): PostEvent)) must beRight
 
       val result = subject.index(FakeRequest())
 
@@ -28,46 +28,46 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
       val result = subject.add.submit(postId)(FakeRequest().withFormUrlEncodedBody("author" -> "author", "title" -> "title", "body" -> "body"))
 
       status(result) must_== 303
-      subject.posts().get(postId) must beSome(Post(postId, StreamRevision.Initial.next, postContent))
+      memoryImage.get.get(postId) must beSome(Post(postId, StreamRevision.Initial.next, postContent))
     }
 
     "edit post" in new fixture {
-      memoryImage.tryCommit(postId.toString, StreamRevision.Initial, PostAdded(postId, postContent))
+      eventStore.committer.tryCommit(Changes(StreamRevision.Initial, PostAdded(postId, postContent): PostEvent))
 
       val result = subject.edit.submit(postId, StreamRevision(1))(FakeRequest().withFormUrlEncodedBody("author" -> "edited author", "title" -> "edited title", "body" -> "edited body"))
 
       status(result) must_== 303
-      subject.posts().get(postId) must beSome(Post(postId, StreamRevision(2), PostContent(author = "edited author", title = "edited title", body = "edited body")))
+      memoryImage.get.get(postId) must beSome(Post(postId, StreamRevision(2), PostContent(author = "edited author", title = "edited title", body = "edited body")))
     }
 
     "delete post" in new fixture {
-      memoryImage.tryCommit(postId.toString, StreamRevision.Initial, PostAdded(postId, postContent))
+      eventStore.committer.tryCommit(Changes(StreamRevision.Initial, PostAdded(postId, postContent): PostEvent))
 
       val result = subject.delete(postId, StreamRevision(1))(FakeRequest())
 
       status(result) must_== 303
       header("Location", result) must beSome("/posts/")
-      subject.posts().byId must beEmpty
-      subject.posts().orderedByTimeAdded must beEmpty
+      memoryImage.get.byId must beEmpty
+      memoryImage.get.orderedByTimeAdded must beEmpty
     }
 
     "add comment to post" in new fixture {
-      memoryImage.tryCommit(postId.toString, StreamRevision.Initial, PostAdded(postId, postContent))
+      eventStore.committer.tryCommit(Changes(StreamRevision.Initial, PostAdded(postId, postContent): PostEvent))
 
       val result = subject.comments.add(postId, StreamRevision(1))(FakeRequest().withFormUrlEncodedBody("commenter" -> "Commenter", "body" -> "Body"))
 
       status(result) must_== 303
-      subject.posts().get(postId).map(_.comments) must beSome(SortedMap(CommentId(1) -> CommentContent("Commenter", "Body")))
+      memoryImage.get.get(postId).map(_.comments) must beSome(SortedMap(CommentId(1) -> CommentContent("Commenter", "Body")))
     }
 
     "delete comment from post" in new fixture {
-      memoryImage.tryCommit(postId.toString, StreamRevision(0), PostAdded(postId, postContent))
-      memoryImage.tryCommit(postId.toString, StreamRevision(1), CommentAdded(postId, CommentId(1), CommentContent("Commenter", "Body")))
+      eventStore.committer.tryCommit(Changes(StreamRevision(0), PostAdded(postId, postContent): PostEvent))
+      eventStore.committer.tryCommit(Changes(StreamRevision(1), CommentAdded(postId, CommentId(1), CommentContent("Commenter", "Body")): PostEvent))
 
       val result = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(FakeRequest())
 
       status(result) must_== 303
-      subject.posts().get(postId).map(_.comments.get(CommentId(1))) must beSome(None)
+      memoryImage.get.get(postId).map(_.comments.get(CommentId(1))) must beSome(None)
     }
   }
 

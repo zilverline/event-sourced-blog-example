@@ -6,6 +6,7 @@ import play.api.libs.json._
 import _root_.redis.clients.jedis._
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
+import support.EventStreamType
 
 /**
  * Redis event committer that uses the WATCH/MULTI/EXEC commands to ensure the event store's
@@ -19,17 +20,19 @@ trait RedisWatchMultiExecEventCommitter[Event] { this: RedisEventStore[Event] =>
 
     private[this] val lock = new Object
 
-    override def tryCommit(streamId: String, expected: StreamRevision, event: Event): CommitResult[Event] = {
+    override def tryCommit[E <: Event](changes: Changes[E]): CommitResult[E] = {
+      implicit val descriptor = changes.eventStreamType
       val backoff = new Backoff
+      val streamId = descriptor.toString(changes.streamId)
       val streamKey = keyForStream(streamId)
       val result = withJedis { implicit jedis =>
-        @tailrec def tryCommitWithRetry: Either[StreamRevision, Commit[Event]] = {
+        @tailrec def tryCommitWithRetry: Either[StreamRevision, Commit[E]] = {
           val (storeRevision, actual) = prepareCommit(streamKey)
 
-          if (expected != actual) {
-            abortCommit(streamId, actual, expected)
+          if (changes.expected != actual) {
+            abortCommit(streamId, actual, changes.expected)
           } else {
-            val commit = Commit(storeRevision.next, DateTimeUtils.currentTimeMillis, streamId, actual.next, Seq(event))
+            val commit = Commit(storeRevision.next, DateTimeUtils.currentTimeMillis, streamId, actual.next, changes.events)
             if (doCommit(streamKey, commit)) {
               Right(commit)
             } else {
@@ -46,8 +49,8 @@ trait RedisWatchMultiExecEventCommitter[Event] { this: RedisEventStore[Event] =>
       }
 
       result.left.map { actual =>
-        val conflicting = readStream(streamId, since = expected)
-        Conflict(streamId, actual, expected, conflicting)
+        val conflicting = readStream(changes.streamId, since = changes.expected)
+        Conflict(conflicting.flatMap(_.committedEvents))
       }
     }
 

@@ -67,7 +67,7 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
   object given {
     def event(event: PostEvent) = events(event)
     def events(events: PostEvent*) = new {
-      val eventStore = FakeEventStore.fromHistory(events.map(event => event.postId.toString -> event))
+      val eventStore = FakeEventStore.fromHistory(events)
       val posts = Posts.fromHistory(eventStore.reader.readCommits(StoreRevision.Initial, StoreRevision.Maximum).flatMap(_.eventsWithRevision))
       def thenPostWithId(id: PostId) = posts.get(id)
       def thenMostRecent(n: Int) = posts.mostRecent(n)

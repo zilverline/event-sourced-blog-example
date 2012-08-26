@@ -6,6 +6,7 @@ import play.api.Logger
 import play.api.libs.json._
 import _root_.redis.clients.jedis._
 import scala.collection.JavaConverters._
+import support.EventStreamType
 
 trait RedisLuaEventCommitter[Event] { this: RedisEventStore[Event] =>
   protected[this] def eventFormat: Format[Event]
@@ -39,22 +40,23 @@ trait RedisLuaEventCommitter[Event] { this: RedisEventStore[Event] =>
   Logger.debug("Redis Lua TryCommitScript loaded with id " + TryCommitScriptId)
 
   object committer extends EventCommitter[Event] {
-    override def tryCommit(streamId: String, expected: StreamRevision, event: Event): CommitResult[Event] = {
+    override def tryCommit[E <: Event](changes: Changes[E]): CommitResult[E] = {
+      implicit val descriptor = changes.eventStreamType
       val timestamp = DateTimeUtils.currentTimeMillis
-      val serializedEvents = Json.stringify(Json.toJson(Seq(event))(Writes.seqWrites(eventFormat)))
-
+      val serializedEvents = Json.stringify(Json.toJson(changes.events: Seq[Event])(Writes.seqWrites(eventFormat)))
+      val streamId = descriptor.toString(changes.streamId)
       val response = withJedis { _.evalsha(TryCommitScriptId, 2,
         /* KEYS */ CommitsKey, keyForStream(streamId),
-        /* ARGV */ timestamp.toString, streamId, expected.value.toString, serializedEvents)
+        /* ARGV */ timestamp.toString, streamId, changes.expected.value.toString, serializedEvents)
       }
 
       try {
         response.asInstanceOf[java.util.List[_]].asScala match {
           case Seq("conflict", actual: String) =>
-            val conflicting = reader.readStream(streamId, since = expected)
-            Left(Conflict(streamId, StreamRevision(actual.toLong), expected, conflicting))
+            val conflicting = reader.readStream(changes.streamId, since = changes.expected)
+            Left(Conflict(conflicting.flatMap(_.committedEvents)))
           case Seq("commit", storeRevision: String) =>
-            Right(Commit(StoreRevision(storeRevision.toLong), timestamp, streamId, expected.next, Seq(event)))
+            Right(Commit(StoreRevision(storeRevision.toLong), timestamp, streamId, changes.expected.next, changes.events))
         }
       } catch {
         case e: Exception =>
