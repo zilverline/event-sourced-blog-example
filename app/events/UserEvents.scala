@@ -37,7 +37,7 @@ object UserEvent {
   implicit val EmailFormat: Format[Email] = valueFormat(Email.apply)(Email.unapply)
   implicit val PasswordFormat: Format[Password] = valueFormat(Password.apply)(Password.unapply)
 
-  implicit val UserEventFormat: Format[UserEvent] = typeChoiceFormat(
+  implicit val UserEventFormat: TypeChoiceFormat[UserEvent] = TypeChoiceFormat(
     "UserRegistered" -> objectFormat("userId", "login", "password")(UserRegistered.apply)(UserRegistered.unapply),
     "UserPasswordChanged" -> objectFormat("userId", "password")(UserPasswordChanged.apply)(UserPasswordChanged.unapply))
 }

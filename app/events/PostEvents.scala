@@ -55,7 +55,7 @@ object PostEvent {
   implicit val PostContentFormat: Format[PostContent] = objectFormat("author", "title", "body")(PostContent.apply)(PostContent.unapply)
   implicit val CommentContentFormat: Format[CommentContent] = objectFormat("commenter", "body")(CommentContent.apply)(CommentContent.unapply)
 
-  implicit val PostEventFormat: Format[PostEvent] = typeChoiceFormat(
+  implicit val PostEventFormat: TypeChoiceFormat[PostEvent] = TypeChoiceFormat(
     "PostAdded"      -> objectFormat("postId", "content")(PostAdded.apply)(PostAdded.unapply),
     "PostEdited"     -> objectFormat("postId", "content")(PostEdited.apply)(PostEdited.unapply),
     "PostDeleted"    -> objectFormat("postId")(PostDeleted.apply)(PostDeleted.unapply),

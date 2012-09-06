@@ -12,12 +12,12 @@ class JsonMappingSpec extends org.specs2.mutable.Specification with org.specs2.S
   val ChildFormat = format[Child](json => new Child)(o => JsString("child"))
   val SiblingFormat = format[Sibling](json => new Sibling)(o => JsString("sibling"))
 
-  implicit val subject: Format[Parent] = typeChoiceFormat("Child" -> ChildFormat, "Sibling" -> SiblingFormat)
+  implicit val subject: TypeChoiceFormat[Parent] = TypeChoiceFormat("Child" -> ChildFormat, "Sibling" -> SiblingFormat)
 
   "Choice mapping" should {
     "fail on overlapping choices" in {
       val ParentFormat = format[Parent](json => new Parent)(o => JsString("parent"))
-      typeChoiceFormat("parent" -> ParentFormat, "child" -> ChildFormat) must throwAn[IllegalArgumentException]
+      TypeChoiceFormat("parent" -> ParentFormat, "child" -> ChildFormat) must throwAn[IllegalArgumentException]
     }
 
     "choose among sub-types when writing" in {
@@ -28,6 +28,17 @@ class JsonMappingSpec extends org.specs2.mutable.Specification with org.specs2.S
     "choose among sub-types when reading" in {
       Json.fromJson[Parent](Json.parse("""{"type":"Child","data":"child"}""")) must_== Child()
       Json.fromJson[Parent](Json.parse("""{"type":"Sibling","data":"sibling"}""")) must_== Sibling()
+    }
+
+    "combine with other mapping" in {
+      val OtherFormat = TypeChoiceFormat("String" -> implicitly[Format[String]])
+      implicit val CombinedFormat: Format[AnyRef] = subject and OtherFormat
+
+      Json.stringify(Json.toJson(new Child: AnyRef)) must_== """{"type":"Child","data":"child"}"""
+      Json.stringify(Json.toJson("string": AnyRef)) must_== """{"type":"String","data":"string"}"""
+
+      Json.fromJson[AnyRef](Json.parse("""{"type":"Sibling","data":"sibling"}""")) must_== Sibling()
+      Json.fromJson[AnyRef](Json.parse("""{"type":"String","data":"string"}""")) must_== "string"
     }
   }
 }

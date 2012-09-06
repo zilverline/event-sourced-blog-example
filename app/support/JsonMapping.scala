@@ -30,11 +30,19 @@ object JsonMapping {
    * There must be no overlap between the different sub-types (none of the provided
    * sub-types can be assignable to another one).
    */
-  def typeChoiceFormat[R](choices: TypeChoiceMapping[_ <: R]*): Format[R] = new Format[R] {
+  class TypeChoiceFormat[R](private val choices: Seq[TypeChoiceMapping[_ <: R]]) extends Format[R] {
     {
+      val typeNames = choices.map(_.typeName)
+      require(typeNames == typeNames.distinct, "duplicate type names in: " + typeNames.mkString(", "))
       val overlapping = choices.combinations(2).filter(pair => pair(0).erasure isAssignableFrom pair(1).erasure)
       require(overlapping.isEmpty, "overlapping choices are not allowed: " + overlapping.map(pair => pair(0).manifest + " is assignable from " + pair(1).manifest).mkString(", "))
     }
+
+    /**
+     * Combine two type choice formats.
+     */
+    def and[RR >: R](that: TypeChoiceFormat[_ <: RR])(implicit manifest: Manifest[RR]): TypeChoiceFormat[RR] =
+      new TypeChoiceFormat[RR](this.choices ++ that.choices)
 
     override def reads(json: JsValue) = {
       val name = (json \ "type").as[String]
@@ -45,6 +53,9 @@ object JsonMapping {
       val mapping = choices.find(_.matchesInstance(o)).getOrElse(throw new IllegalArgumentException("no mapping found for instance " + o))
       JsObject(Seq("type" -> toJson(mapping.typeName), "data" -> mapping.toJson(o)))
     }
+  }
+  object TypeChoiceFormat {
+    def apply[R](choices: TypeChoiceMapping[_ <: R]*): TypeChoiceFormat[R] = new TypeChoiceFormat[R](choices)
   }
 
   case class TypeChoiceMapping[A](typeName: String, format: Format[A], manifest: Manifest[A]) {
