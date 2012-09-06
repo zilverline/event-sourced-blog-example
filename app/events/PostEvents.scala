@@ -31,7 +31,7 @@ case class CommentContent(commenter: String, body: String)
  * be serialized to durable storage and may be retrieved for many years, they need
  * to be stable, with no or few external dependencies.
  */
-sealed trait PostEvent {
+sealed trait PostEvent extends DomainEvent {
   def postId: PostId
 }
 case class PostAdded(postId: PostId, content: PostContent) extends PostEvent

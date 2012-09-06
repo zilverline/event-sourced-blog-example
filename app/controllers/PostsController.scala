@@ -12,7 +12,7 @@ import scala.annotation.tailrec
 import support.Mappings._
 
 object PostsController extends PostsController(Global.persistence.memoryImage)
-class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Controller {
+class PostsController(memoryImage: MemoryImage[State, PostEvent]) extends Controller {
   /**
    * Blog content form definition.
    */
@@ -141,7 +141,7 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
   /**
    * The current blog posts from the memory image.
    */
-  private[this] def posts(): Posts = memoryImage.get
+  private[this] def posts(): Posts = memoryImage.get.posts
 
   /**
    * 404 Not Found response.
@@ -153,5 +153,5 @@ class PostsController(memoryImage: MemoryImage[Posts, PostEvent]) extends Contro
    * returns the result, if it exists. Otherwise `None` is returned.
    */
   private[this] def updatePost[A](id: PostId)(body: Post => Transaction[PostEvent, A]): Option[A] =
-    memoryImage.modify { _.get(id).map(body).sequence }
+    memoryImage.modify { _.posts.get(id).map(body).sequence }
 }

@@ -28,7 +28,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
       val result = subject.add.submit(postId)(FakeRequest().withFormUrlEncodedBody("author" -> "author", "title" -> "title", "body" -> "body"))
 
       status(result) must_== 303
-      memoryImage.get.get(postId) must beSome(Post(postId, StreamRevision.Initial.next, postContent))
+      posts.get(postId) must beSome(Post(postId, StreamRevision.Initial.next, postContent))
     }
 
     "edit post" in new fixture {
@@ -37,7 +37,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
       val result = subject.edit.submit(postId, StreamRevision(1))(FakeRequest().withFormUrlEncodedBody("author" -> "edited author", "title" -> "edited title", "body" -> "edited body"))
 
       status(result) must_== 303
-      memoryImage.get.get(postId) must beSome(Post(postId, StreamRevision(2), PostContent(author = "edited author", title = "edited title", body = "edited body")))
+      posts.get(postId) must beSome(Post(postId, StreamRevision(2), PostContent(author = "edited author", title = "edited title", body = "edited body")))
     }
 
     "delete post" in new fixture {
@@ -47,8 +47,8 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
 
       status(result) must_== 303
       header("Location", result) must beSome("/posts/")
-      memoryImage.get.byId must beEmpty
-      memoryImage.get.orderedByTimeAdded must beEmpty
+      posts.byId must beEmpty
+      posts.orderedByTimeAdded must beEmpty
     }
 
     "add comment to post" in new fixture {
@@ -57,7 +57,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
       val result = subject.comments.add(postId, StreamRevision(1))(FakeRequest().withFormUrlEncodedBody("commenter" -> "Commenter", "body" -> "Body"))
 
       status(result) must_== 303
-      memoryImage.get.get(postId).map(_.comments) must beSome(SortedMap(CommentId(1) -> CommentContent("Commenter", "Body")))
+      posts.get(postId).map(_.comments) must beSome(SortedMap(CommentId(1) -> CommentContent("Commenter", "Body")))
     }
 
     "delete comment from post" in new fixture {
@@ -67,18 +67,20 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
       val result = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(FakeRequest())
 
       status(result) must_== 303
-      memoryImage.get.get(postId).map(_.comments.get(CommentId(1))) must beSome(None)
+      posts.get(postId).map(_.comments.get(CommentId(1))) must beSome(None)
     }
   }
 
   trait fixture extends After { self =>
     val eventStore: EventStore[PostEvent] = new fake.FakeEventStore
 
-    val memoryImage = MemoryImage[Posts, PostEvent](eventStore)(Posts()) {
-      (posts, commit) => posts.updateMany(commit.eventsWithRevision)
+    val memoryImage = MemoryImage[State, PostEvent](eventStore)(State()) {
+      (state, commit) => state.updateMany(commit.eventsWithRevision)
     }
 
     val subject = new PostsController(memoryImage)
+
+    def posts = memoryImage.get.posts
 
     override def after {
       eventStore.close

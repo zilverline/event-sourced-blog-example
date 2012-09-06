@@ -24,7 +24,7 @@ object Password {
   def fromPlainText(password: String) = Password(SCryptUtil.scrypt(password, 1 << 14, 8, 2))
 }
 
-sealed trait UserEvent {
+sealed trait UserEvent extends DomainEvent {
   def userId: UserId
 }
 case class UserRegistered(userId: UserId, login: Email, password: Password) extends UserEvent

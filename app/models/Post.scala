@@ -43,12 +43,5 @@ case class Posts(byId: Map[PostId, Post] = Map.empty, orderedByTimeAdded: Seq[Po
       }
   }
 
-  def updateMany(events: Seq[(PostEvent, StreamRevision)]): Posts = events.foldLeft(this) { (posts, event) =>
-    posts.update(event._1, event._2)
-  }
-
   private[this] def modify(id: PostId)(f: Post => Post) = this.copy(byId = byId.updated(id, f(byId(id))))
-}
-object Posts {
-  def fromHistory(events: Seq[(PostEvent, StreamRevision)]): Posts = Posts().updateMany(events)
 }
