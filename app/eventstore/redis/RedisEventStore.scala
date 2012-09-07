@@ -3,6 +3,7 @@ package redis
 
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import org.apache.commons.pool.impl.GenericObjectPool.Config
 import org.joda.time.DateTimeUtils
 import play.api.Logger
@@ -220,6 +221,9 @@ abstract class RedisEventStore[Event] protected (name: String, host: String, por
     closed = true
     withJedis { _.publish(ControlChannel, CloseToken) }
     executor.shutdown
+    if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+      executor.shutdownNow
+    }
     jedisPool.destroy
   }
 

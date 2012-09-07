@@ -87,10 +87,14 @@ class MemoryImageSpec extends org.specs2.mutable.Specification with org.specs2.S
     }
   }
 
-  trait fixture extends org.specs2.specification.Scope {
+  trait fixture extends org.specs2.mutable.After {
     val eventStore = new fake.FakeEventStore[Event]
     val subject = MemoryImage[State, Event](eventStore)(Seq.empty) { (state, commit) =>
       state ++ commit.events
+    }
+
+    def after {
+      eventStore.close
     }
   }
 }

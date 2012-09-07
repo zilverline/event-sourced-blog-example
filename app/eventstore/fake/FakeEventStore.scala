@@ -1,8 +1,9 @@
 package eventstore
 package fake
 
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import org.joda.time.DateTimeUtils
-import scala.actors.threadpool.Executors
 import scala.annotation.tailrec
 import scala.concurrent.stm._
 import support.EventStreamType
@@ -106,5 +107,8 @@ class FakeEventStore[Event] extends EventStore[Event] {
   def close(): Unit = {
     closed() = true
     executor.shutdown
+    if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+      executor.shutdownNow
+    }
   }
 }
