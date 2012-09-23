@@ -1,0 +1,12 @@
+@(form: Form[_])
+
+@if(form.hasErrors) {
+  <div class="alert alert-error">
+    <p>Please resolve the following errors</p>
+    <ul>
+      @for(error <- form.errors) {
+        <li>@if(error.key.nonEmpty) {@Messages(error.key): }@Messages(error.message, error.args: _*)</li>
+      }
+    </ul>
+  </div>
+}

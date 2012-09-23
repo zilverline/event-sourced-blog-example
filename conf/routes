@@ -5,6 +5,7 @@
 # Home page
 GET     /                           controllers.Application.index
 
+# Blog posts
 GET     /posts                      controllers.Default.redirect(to="/posts/")
 GET     /posts/                     controllers.PostsController.index
 GET     /posts/new                  controllers.PostsController.add.show
@@ -16,6 +17,10 @@ GET     /posts/:id                  controllers.PostsController.show(id: PostId)
 
 POST    /posts/:postId/comments/                   controllers.PostsController.comments.add(postId: PostId, r: StreamRevision)
 POST    /posts/:postId/comments/:commentId/delete  controllers.PostsController.comments.delete(postId: PostId, r: StreamRevision, commentId: CommentId)
+
+# Users
+GET     /register                   controllers.UsersController.register.show
+POST    /register                   controllers.UsersController.register.submit
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)

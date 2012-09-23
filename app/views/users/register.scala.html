@@ -1,0 +1,18 @@
+@(form: Form[(Email, Password)], conflicts: Seq[UserEvent] = Nil)(implicit request: RequestHeader)
+@import views.support._
+
+@main("Register") {
+  @helper.form(action = routes.UsersController.register.submit) {
+    @globalErrorsPanel(form)
+    <fieldset>
+      @helper.inputText(form("email"), '_label -> Messages("email"), 'autofocus -> "autofocus", 'required -> "required")
+      @helper.inputPassword(form("password")("enter"), '_label -> Messages("password.enter"), 'required -> "required")
+      @helper.inputPassword(form("password")("confirm"), '_label -> Messages("password.confirm"), 'required -> "required")
+    </fieldset>
+
+    <fieldset>
+      <button class="btn btn-primary">Register</button>
+      <a class="btn" href="@routes.PostsController.index()">Cancel</a>
+    </fieldset>
+  }
+}

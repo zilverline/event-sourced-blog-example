@@ -9,6 +9,9 @@ import support.Identifier
 import support.IdentifierCompanion
 import support.JsonMapping._
 
+/**
+ * Strongly typed identifier for users.
+ */
 case class UserId(uuid: UUID) extends Identifier
 object UserId extends IdentifierCompanion[UserId]("UserId")
 

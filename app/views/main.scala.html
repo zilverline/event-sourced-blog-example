@@ -18,6 +18,16 @@
                     <ul class="nav">
                         <li><a href="@routes.PostsController.index">Posts</a></li>
                     </ul>
+                    <ul class="nav pull-right">
+                        <li>
+                            <form class="navbar-form">
+                                <input type="text" class="span2" placeholder="Email...">
+                                <input type="password" class="span2" placeholder="Password...">
+                                <button type="submit" class="btn btn-primary">Login</button>
+                            </form>
+                        </li>
+                        <li><a href="@routes.UsersController.register.show"><em>or&nbsp;</em>register</a></li>
+                    </ul>
                 </div>
             </div>
         </div>

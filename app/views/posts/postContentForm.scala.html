@@ -1,5 +1,5 @@
 @(label: String, action: Call, form: Form[PostContent], conflicts: Seq[PostEvent] = Nil)
-@import helper.twitterBootstrap._
+@import views.support._
 
 @helper.form(action = action) {
   @globalErrorsPanel(form)

@@ -1,0 +1,11 @@
+# Form field names (used as key in error messages)
+author=Author
+title=Title
+body=Body
+email=Email
+password=Password
+password.enter=Enter Password
+password.confirm=Confirm Password
+
+# Form validation errors.
+error.password.mismatch=Passwords do no match
