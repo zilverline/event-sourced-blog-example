@@ -1,4 +1,4 @@
-@(posts: Seq[Post], conflicts: Seq[PostEvent] = Nil)(implicit request: RequestHeader)
+@(posts: Seq[Post], conflicts: Seq[PostEvent] = Nil)(implicit request: ApplicationRequestHeader)
 
 @main("Blog Posts") {
 

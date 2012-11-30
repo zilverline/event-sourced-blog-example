@@ -1,4 +1,4 @@
-@(id: PostId, revision: StreamRevision, form: Form[PostContent], conflicts: Seq[PostEvent] = Nil)(implicit request: RequestHeader)
+@(id: PostId, revision: StreamRevision, form: Form[PostContent], conflicts: Seq[PostEvent] = Nil)(implicit request: ApplicationRequestHeader)
 
 @main("Edit blog post") {
   @postContentForm(label = "Save", action = routes.PostsController.edit.submit(id, revision), form = form, conflicts = conflicts)

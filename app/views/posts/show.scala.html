@@ -1,4 +1,4 @@
-@(post: Post, form: Form[CommentContent], conflicts: Seq[PostEvent] = Nil)(implicit request: RequestHeader)
+@(post: Post, form: Form[CommentContent], conflicts: Seq[PostEvent] = Nil)(implicit request: ApplicationRequestHeader)
 @import helper.twitterBootstrap._
 
 @main(post.content.title) {

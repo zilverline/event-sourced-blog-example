@@ -19,9 +19,14 @@ POST    /posts/:postId/comments/                   controllers.PostsController.c
 POST    /posts/:postId/comments/:commentId/delete  controllers.PostsController.comments.delete(postId: PostId, r: StreamRevision, commentId: CommentId)
 
 # Users
+GET     /users/log-in               controllers.UsersController.authentication.show
+POST    /users/log-in               controllers.UsersController.authentication.submit
+GET     /users/logged-out           controllers.UsersController.authentication.loggedOut
 GET     /users/register             controllers.UsersController.register.show
 POST    /users/register             controllers.UsersController.register.submit
-GET     /users/:id/registered       controllers.UsersController.register.registered(id: UserId)
+GET     /users/registered           controllers.UsersController.register.registered
+GET     /users/logged-in            controllers.UsersController.authentication.loggedIn
+GET     /users/log-out              controllers.UsersController.authentication.logOut
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)

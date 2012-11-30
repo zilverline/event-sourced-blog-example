@@ -16,6 +16,7 @@ case class UserId(uuid: UUID) extends Identifier
 object UserId extends IdentifierCompanion[UserId]("UserId")
 
 case class Email(value: String)
+
 case class Password(hash: String) {
   require(hash.startsWith("$s0$"), "Are you sure you passed in the password hash?")
 
@@ -32,6 +33,8 @@ sealed trait UserEvent extends DomainEvent {
 }
 case class UserRegistered(userId: UserId, login: Email, password: Password) extends UserEvent
 case class UserPasswordChanged(userId: UserId, password: Password) extends UserEvent
+case class UserLoggedIn(userId: UserId, token: String) extends UserEvent
+case class UserLoggedOut(userId: UserId) extends UserEvent
 
 object UserEvent {
   implicit val UserEventDescriptor: EventStreamType[UserId, UserEvent] = EventStreamType(_.toString, _.userId)
@@ -42,5 +45,7 @@ object UserEvent {
 
   implicit val UserEventFormat: TypeChoiceFormat[UserEvent] = TypeChoiceFormat(
     "UserRegistered" -> objectFormat("userId", "login", "password")(UserRegistered.apply)(UserRegistered.unapply),
-    "UserPasswordChanged" -> objectFormat("userId", "password")(UserPasswordChanged.apply)(UserPasswordChanged.unapply))
+    "UserPasswordChanged" -> objectFormat("userId", "password")(UserPasswordChanged.apply)(UserPasswordChanged.unapply),
+    "UserLoggedIn" -> objectFormat("userId", "authenticationToken")(UserLoggedIn.apply)(UserLoggedIn.unapply),
+    "UserLoggedOut" -> objectFormat("userId")(UserLoggedOut.apply)(UserLoggedOut.unapply))
 }

@@ -12,7 +12,7 @@ import scala.annotation.tailrec
 import support.Mappings._
 
 object PostsController extends PostsController(Global.persistence.memoryImage)
-class PostsController(memoryImage: MemoryImage[State, PostEvent]) extends Controller {
+class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) extends ApplicationController[PostEvent] {
   /**
    * Blog content form definition.
    */
@@ -24,14 +24,14 @@ class PostsController(memoryImage: MemoryImage[State, PostEvent]) extends Contro
   /**
    * Show an overview of the most recent blog posts.
    */
-  def index = Action { implicit request =>
+  def index = ApplicationAction { implicit request =>
     Ok(views.html.posts.index(posts().mostRecent(20)))
   }
 
   /**
    * Show a specific blog post.
    */
-  def show(id: PostId) = Action { implicit request =>
+  def show(id: PostId) = ApplicationAction { implicit request =>
     posts().get(id) map { post =>
       Ok(views.html.posts.show(post, comments.commentContentForm))
     } getOrElse {
@@ -43,11 +43,11 @@ class PostsController(memoryImage: MemoryImage[State, PostEvent]) extends Contro
    * Show and submit actions for adding a new blog post.
    */
   object add {
-    def show = Action { implicit request =>
+    def show = ApplicationAction { implicit request =>
       Ok(views.html.posts.add(PostId.generate(), postContentForm))
     }
 
-    def submit(id: PostId) = Action { implicit request =>
+    def submit(id: PostId) = ApplicationAction { implicit request =>
       postContentForm.bindFromRequest.fold(
         formWithErrors =>
           BadRequest(views.html.posts.add(id, formWithErrors)),
@@ -64,13 +64,13 @@ class PostsController(memoryImage: MemoryImage[State, PostEvent]) extends Contro
    * Show and submit actions for editing an existing blog post.
    */
   object edit {
-    def show(id: PostId) = Action { implicit request =>
+    def show(id: PostId) = ApplicationAction { implicit request =>
       posts.get(id) map { post =>
         Ok(views.html.posts.edit(post.id, post.revision, postContentForm.fill(post.content)))
       } getOrElse notFound
     }
 
-    def submit(id: PostId, expected: StreamRevision) = Action { implicit request =>
+    def submit(id: PostId, expected: StreamRevision) = ApplicationAction { implicit request =>
       updatePost(id) { post =>
         postContentForm.bindFromRequest.fold(
           formWithErrors =>
@@ -88,7 +88,7 @@ class PostsController(memoryImage: MemoryImage[State, PostEvent]) extends Contro
   /**
    * Delete a blog post.
    */
-  def delete(id: PostId, expected: StreamRevision) = Action { implicit request =>
+  def delete(id: PostId, expected: StreamRevision) = ApplicationAction { implicit request =>
     def deletedResult = Redirect(routes.PostsController.index).flashing("info" -> "Post deleted.")
     updatePost(id) { post =>
       Changes(expected, PostDeleted(id): PostEvent).commit(
@@ -107,7 +107,7 @@ class PostsController(memoryImage: MemoryImage[State, PostEvent]) extends Contro
       "commenter" -> trimmedText.verifying(minLength(3)),
       "body"      -> trimmedText.verifying(minLength(3)))(CommentContent.apply)(CommentContent.unapply))
 
-    def add(postId: PostId, expected: StreamRevision) = Action { implicit request =>
+    def add(postId: PostId, expected: StreamRevision) = ApplicationAction { implicit request =>
       updatePost(postId) { post =>
         commentContentForm.bindFromRequest.fold(
           formWithErrors =>
@@ -121,7 +121,7 @@ class PostsController(memoryImage: MemoryImage[State, PostEvent]) extends Contro
       }
     }
 
-    def delete(postId: PostId, expected: StreamRevision, commentId: CommentId) = Action { implicit request =>
+    def delete(postId: PostId, expected: StreamRevision, commentId: CommentId) = ApplicationAction { implicit request =>
       updatePost(postId) { post =>
         def deletedResult = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment deleted.")
         post.comments.get(commentId) match {

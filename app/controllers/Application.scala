@@ -2,9 +2,13 @@ package controllers
 
 import play.api._
 import play.api.mvc._
+import eventstore.MemoryImage
+import models.State
 
-object Application extends Controller {
-  def index = Action { implicit request =>
+object Application extends ApplicationController[Nothing] {
+  override def memoryImage = Global.persistence.memoryImage
+
+  def index = ApplicationAction { implicit request =>
     Ok(views.html.index())
   }
 }

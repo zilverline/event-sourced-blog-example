@@ -1,0 +1,15 @@
+@(form: Form[_])(implicit request: ApplicationRequestHeader)
+@import views.support._
+
+@main("Log in") {
+  @helper.form(action = routes.UsersController.authentication.submit) {
+    @globalErrorsPanel(form)
+    <fieldset>
+      @helper.inputText(form("email"), '_label -> Messages("email"), 'autofocus -> "autofocus", 'required -> "required")
+      @helper.inputPassword(form("password"), '_label -> Messages("password"), 'required -> "required")
+    </fieldset>
+    <fieldset>
+      <button type="submit" class="btn btn-primary">Login</button>
+    </fieldset>
+  }
+}

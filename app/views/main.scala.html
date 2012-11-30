@@ -1,4 +1,4 @@
-@(title: String)(content: Html)(implicit request: RequestHeader)
+@(title: String)(content: Html)(implicit request: ApplicationRequestHeader)
 
 <!DOCTYPE html>
 
@@ -18,15 +18,13 @@
                     <ul class="nav">
                         <li><a href="@routes.PostsController.index">Posts</a></li>
                     </ul>
-                    <ul class="nav pull-right">
-                        <li>
-                            <form class="navbar-form">
-                                <input type="text" class="span2" placeholder="Email...">
-                                <input type="password" class="span2" placeholder="Password...">
-                                <button type="submit" class="btn btn-primary">Login</button>
-                            </form>
-                        </li>
-                        <li><a href="@routes.UsersController.register.show"><em>or&nbsp;</em>register</a></li>
+                    <ul class="nav pull-right">@request.currentUser.map { user =>
+                        <li><a href="#">Welcome, @user.login.value</a></li>
+                        <li><a href="@routes.UsersController.authentication.logOut">Log out</a></li>
+                      }.getOrElse {
+                        <li><a href="@routes.UsersController.authentication.show">Log in</a></li>
+                        <li><a href="@routes.UsersController.register.show">Register</a></li>
+                      }
                     </ul>
                 </div>
             </div>
