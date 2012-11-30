@@ -4,8 +4,8 @@ title=Title
 body=Body
 email=Email
 password=Password
-password.enter=Enter Password
-password.confirm=Confirm Password
+password.1=Choose Password
+password.2=Confirm Password
 
 # Form validation errors.
 error.password.mismatch=Passwords do no match

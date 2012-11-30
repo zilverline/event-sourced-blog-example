@@ -6,8 +6,8 @@
     @globalErrorsPanel(form)
     <fieldset>
       @helper.inputText(form("email"), '_label -> Messages("email"), 'autofocus -> "autofocus", 'required -> "required")
-      @helper.inputPassword(form("password")("enter"), '_label -> Messages("password.enter"), 'required -> "required")
-      @helper.inputPassword(form("password")("confirm"), '_label -> Messages("password.confirm"), 'required -> "required")
+      @helper.inputPassword(form("password")("1"), '_label -> Messages("password.1"), 'required -> "required")
+      @helper.inputPassword(form("password")("2"), '_label -> Messages("password.2"), 'required -> "required")
     </fieldset>
 
     <fieldset>

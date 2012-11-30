@@ -19,7 +19,7 @@ case class Email(value: String)
 case class Password(hash: String) {
   require(hash.startsWith("$s0$"), "Are you sure you passed in the password hash?")
 
-  def check(password: String): Boolean = SCryptUtil.check(password, hash)
+  def verify(password: String): Boolean = SCryptUtil.check(password, hash)
 
   override def toString = "Password(<HASH>)"
 }
