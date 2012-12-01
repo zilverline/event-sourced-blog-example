@@ -17,13 +17,11 @@ import support.Forms._
 object UsersController extends UsersController(Global.persistence.memoryImage)
 class UsersController(override val memoryImage: MemoryImage[State, UserEvent]) extends ApplicationController[UserEvent] {
   object authentication {
-    private[this] val random = new SecureRandom()
-    def generateAuthenticationToken() = "%08x-%08x".format(random.nextLong, random.nextLong)
-    def authenticate(users: Users)(login: Email, password: String): Option[(User, String)] =
-      users.get(login).filter(_.password.verify(password)).map { user => (user, generateAuthenticationToken()) }
+    def authenticate(users: Users)(login: EmailAddress, password: String): Option[(User, AuthenticationToken)] =
+      users.get(login).filter(_.password.verify(password)).map { user => (user, AuthenticationToken.generate) }
 
-    val loginForm: Form[(Email, String)] = Form(tuple(
-      "email" -> email.transform[Email](Email.apply, _.value),
+    val loginForm: Form[(EmailAddress, String)] = Form(tuple(
+      "email" -> email.transform[EmailAddress](EmailAddress.apply, _.value),
       "password" -> text.transform[String](identity, _ => "")))
 
     def show = ApplicationAction { implicit request => Ok(views.html.users.log_in(loginForm)) }
@@ -35,7 +33,7 @@ class UsersController(override val memoryImage: MemoryImage[State, UserEvent]) e
           authenticate(state.users)(authentication._1, authentication._2) map {
             case (user, token) =>
               Changes(user.revision, UserLoggedIn(user.userId, token): UserEvent).commit(
-                onCommit = Redirect(routes.UsersController.authentication.loggedIn).withSession("authenticationToken" -> token),
+                onCommit = Redirect(routes.UsersController.authentication.loggedIn).withSession("authenticationToken" -> token.toString),
                 onConflict = conflict => sys.error("conflict"))
           } getOrElse {
             abort(BadRequest(views.html.users.log_in(loginForm.copy(errors = Seq(FormError("", "Your email and password did not match a known account."))))))
@@ -69,8 +67,8 @@ class UsersController(override val memoryImage: MemoryImage[State, UserEvent]) e
     /**
      * Registration form.
      */
-    val registrationForm: Form[(Email, Password)] = Form(tuple(
-      "email" -> email.transform[Email](Email.apply, _.value),
+    val registrationForm: Form[(EmailAddress, Password)] = Form(tuple(
+      "email" -> email.transform[EmailAddress](EmailAddress.apply, _.value),
       "password" -> confirmPasswordMapping))
 
     def show = ApplicationAction { implicit request =>

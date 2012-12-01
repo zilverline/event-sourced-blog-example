@@ -5,35 +5,11 @@ import java.util.UUID
 import org.joda.time.DateTimeUtils
 import org.scalacheck._, Arbitrary.arbitrary, Prop.forAll
 import play.api.libs.json._
+import IdentifierSpec._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
   import PostEventsSpec._
-
-  "PostId" should {
-    "be equal to itself" in forAll { (id: PostId) =>
-      id must_== id
-    }
-
-    "generate unique values" in forAll { (a: PostId, b: PostId) =>
-      a must_!= b
-    }
-
-    "convert to and from Strings" in forAll { (id: PostId) =>
-      PostId.fromString(id.toString) must beSome(id)
-    }
-
-    "convert to and from JSON" in forAll { (id: PostId) =>
-      Json.fromJson[PostId](Json.toJson(id)) must_== id
-    }
-
-    "fail to parse invalid strings" in forAll { (s: String) =>
-      PostId.fromString(s) match {
-        case Some(postId) => postId.toString must_== s
-        case None         => ok
-      }
-    }
-  }
 
   "Post events" should {
     "convert to and from JSON" in forAll(eventsForMultiplePosts.arbitrary) { events =>
@@ -77,8 +53,6 @@ class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.Sc
 }
 
 object PostEventsSpec {
-  implicit val arbitraryPostId: Arbitrary[PostId] = Arbitrary(Gen.wrap(PostId.generate()))
-
   implicit val arbitraryPostContent: Arbitrary[PostContent] = Arbitrary(Gen.resultOf(PostContent.apply _))
   implicit val arbitraryCommentContent: Arbitrary[CommentContent] = Arbitrary(Gen.resultOf(CommentContent.apply _))
 

@@ -13,8 +13,9 @@ import play.api.Play
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class UsersControllerSpec extends org.specs2.mutable.Specification {
   val userId = UserId.generate()
-  val email = Email("john@example.com")
+  val email = EmailAddress("john@example.com")
   val password = Password.fromPlainText("password")
+  val authenticationToken = AuthenticationToken.generate
 
   "users controller" should {
     "register a new user" in new fixture {
@@ -23,8 +24,8 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
       val result = subject.register.submit(request)
 
       status(result) must_== 303
-      val user = users.get(Email("john@example.com")) getOrElse { failure("user not registered") }
-      user.login must_== Email("john@example.com")
+      val user = users.get(EmailAddress("john@example.com")) getOrElse { failure("user not registered") }
+      user.emailAddress must_== EmailAddress("john@example.com")
       user.password.verify("password") aka "password verified" must beTrue
     }
 
@@ -34,19 +35,19 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
       val result = subject.authentication.submit(FakeRequest().withFormUrlEncodedBody("email" -> email.value, "password" -> "password"))
 
       status(result) must_== 303
-      val token = session(result).get("authenticationToken") getOrElse { failure("authentication token not created") }
+      val token = session(result).get("authenticationToken").flatMap(AuthenticationToken.fromString) getOrElse { failure("authentication token not created") }
       val user = users.authenticated(token) getOrElse { failure("token not mapped to user") }
-      user.login must_== email
+      user.emailAddress must_== email
     }
 
     "allow logged in users to log out" in new fixture {
-      given(UserRegistered(userId, email, password), UserLoggedIn(userId, "token"))
+      given(UserRegistered(userId, email, password), UserLoggedIn(userId, authenticationToken))
 
-      val result = subject.authentication.logOut(FakeRequest().withSession("authenticationToken" -> "token"))
+      val result = subject.authentication.logOut(FakeRequest().withSession("authenticationToken" -> authenticationToken.toString))
 
       status(result) must_== 303
       session(result) must beEmpty
-      users.authenticated("token") must beNone
+      users.authenticated(authenticationToken) must beNone
     }
   }
 

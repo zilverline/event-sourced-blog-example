@@ -3,12 +3,12 @@ package models
 import events._
 import eventstore._
 
-case class User(userId: UserId, revision: StreamRevision, login: Email, password: Password, authenticationToken: Option[String] = None)
+case class User(userId: UserId, revision: StreamRevision, emailAddress: EmailAddress, password: Password, authenticationToken: Option[AuthenticationToken] = None)
 
-case class Users(byId: Map[UserId, User] = Map.empty, byLogin: Map[Email, UserId] = Map.empty, byAuthenticationToken: Map[String, UserId] = Map.empty) {
-  def get(login: Email) = byLogin.get(login).map(byId)
+case class Users(byId: Map[UserId, User] = Map.empty, byLogin: Map[EmailAddress, UserId] = Map.empty, byAuthenticationToken: Map[AuthenticationToken, UserId] = Map.empty) {
+  def get(login: EmailAddress) = byLogin.get(login).map(byId)
 
-  def authenticated(authenticationToken: String): Option[User] = byAuthenticationToken.get(authenticationToken).map(byId)
+  def authenticated(authenticationToken: AuthenticationToken): Option[User] = byAuthenticationToken.get(authenticationToken).map(byId)
 
   def update(event: UserEvent, revision: StreamRevision): Users = event match {
     case UserRegistered(userId, login, password) =>

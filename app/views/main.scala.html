@@ -19,7 +19,7 @@
                         <li><a href="@routes.PostsController.index">Posts</a></li>
                     </ul>
                     <ul class="nav pull-right">@request.currentUser.map { user =>
-                        <li><a href="#">Welcome, @user.login.value</a></li>
+                        <li><a href="#">Welcome, @user.emailAddress</a></li>
                         <li><a href="@routes.UsersController.authentication.logOut">Log out</a></li>
                       }.getOrElse {
                         <li><a href="@routes.UsersController.authentication.show">Log in</a></li>
