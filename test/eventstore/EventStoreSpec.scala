@@ -6,7 +6,6 @@ import org.joda.time.DateTimeUtils
 import org.scalacheck._, Arbitrary.arbitrary, Prop.{ forAll, forAllNoShrink }
 import org.specs2.matcher.Matcher
 import play.api.libs.json._
-import support.EventStreamType
 
 object EventStoreSpec {
   private[this] implicit def arbitrarySeq[A: Arbitrary]: Arbitrary[Seq[A]] = Arbitrary(arbitrary[List[A]])

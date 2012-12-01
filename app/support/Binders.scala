@@ -1,9 +1,11 @@
 package support
 
+import events.CommentId
+import events.Identifier
+import events.IdentifierCompanion
+import eventstore.{ StoreRevision, StreamRevision }
 import java.net.URLDecoder
 import java.util.UUID
-import events.CommentId
-import eventstore.{ StoreRevision, StreamRevision }
 
 object Binders {
   implicit def IdentifierPathBindable[A <: Identifier](implicit companion: IdentifierCompanion[A]) = new play.api.mvc.PathBindable[A] {

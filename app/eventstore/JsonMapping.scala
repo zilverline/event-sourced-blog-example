@@ -1,7 +1,8 @@
-package support
+package eventstore
 
 import java.util.UUID
-import play.api.libs.json._, Json.toJson
+import play.api.libs.json._
+import play.api.libs.json.Json.toJson
 
 object JsonMapping {
   implicit val UuidFormat: Format[UUID] = valueFormat(UUID.fromString)(uuid => Some(uuid.toString))

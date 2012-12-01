@@ -7,7 +7,7 @@ import eventstore._
 import models._
 import org.specs2.mutable.After
 import scala.collection.immutable.SortedMap
-import support.EventStreamType
+import eventstore.EventStreamType
 import play.api.Play
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])

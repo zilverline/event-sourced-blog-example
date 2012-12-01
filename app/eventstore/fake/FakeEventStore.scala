@@ -6,7 +6,6 @@ import java.util.concurrent.TimeUnit
 import org.joda.time.DateTimeUtils
 import scala.annotation.tailrec
 import scala.concurrent.stm._
-import support.EventStreamType
 
 object FakeEventStore {
   def fromHistory[StreamId, Event](events: Seq[Event])(implicit descriptor: EventStreamType[StreamId, Event]): FakeEventStore[Event] = {

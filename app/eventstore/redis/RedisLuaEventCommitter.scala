@@ -6,7 +6,6 @@ import play.api.Logger
 import play.api.libs.json._
 import _root_.redis.clients.jedis._
 import scala.collection.JavaConverters._
-import support.EventStreamType
 
 trait RedisLuaEventCommitter[Event] { this: RedisEventStore[Event] =>
   protected[this] def eventFormat: Format[Event]

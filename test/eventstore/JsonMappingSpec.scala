@@ -1,7 +1,9 @@
-package support
+package eventstore
 
-import play.api.libs.json._
 import JsonMapping._
+import play.api.libs.json._
+import org.junit.runner.RunWith
+import org.specs2.runner.JUnitRunner
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class JsonMappingSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {

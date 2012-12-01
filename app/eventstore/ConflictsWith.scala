@@ -1,6 +1,4 @@
-package support
-
-import eventstore.Conflict
+package eventstore
 
 /**
  * Compares committed events against an attempted events to check for

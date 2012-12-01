@@ -1,13 +1,11 @@
 package events
 
 import com.lambdaworks.crypto.SCryptUtil
+import eventstore.ConflictsWith
+import eventstore.EventStreamType
+import eventstore.JsonMapping._
 import java.util.UUID
 import play.api.libs.json.Format
-import support.ConflictsWith
-import support.EventStreamType
-import support.Identifier
-import support.IdentifierCompanion
-import support.JsonMapping._
 
 /**
  * Strongly typed identifier for users.

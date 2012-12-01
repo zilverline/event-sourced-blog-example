@@ -9,7 +9,7 @@ import play.api.data._
 import play.api.data.Forms._
 import play.api.data.validation.Constraints._
 import scala.annotation.tailrec
-import support.Mappings._
+import support.Forms._
 
 object PostsController extends PostsController(Global.persistence.memoryImage)
 class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) extends ApplicationController[PostEvent] {

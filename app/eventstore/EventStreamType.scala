@@ -1,4 +1,4 @@
-package support
+package eventstore
 
 /**
  * Event stream type information.

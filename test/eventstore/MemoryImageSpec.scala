@@ -2,8 +2,6 @@ package eventstore
 
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import support.ConflictsWith
-import support.EventStreamType
 import Transaction._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])

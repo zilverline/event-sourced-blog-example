@@ -2,8 +2,6 @@ package eventstore
 
 import scala.concurrent.stm._
 import scala.annotation.tailrec
-import support.ConflictsWith
-import support.EventStreamType
 
 /**
  * The transaction to commit to the event when modifying the memory image.

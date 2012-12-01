@@ -5,7 +5,6 @@ import java.util.UUID
 import org.joda.time.DateTimeUtils
 import org.scalacheck._, Arbitrary.arbitrary, Prop.forAll
 import play.api.libs.json._
-import support.ConflictsWith
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {

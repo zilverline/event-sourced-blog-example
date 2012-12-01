@@ -1,12 +1,10 @@
 package events
 
+import eventstore.ConflictsWith
+import eventstore.EventStreamType
+import eventstore.JsonMapping._
 import java.util.UUID
 import play.api.libs.json._
-import support.ConflictsWith
-import support.EventStreamType
-import support.Identifier
-import support.IdentifierCompanion
-import support.JsonMapping._
 
 /**
  * Strongly typed identifiers for posts and comments.

@@ -1,11 +1,10 @@
-package support
+package events
 
-import java.net.URLDecoder
+import eventstore.JsonMapping._
 import java.util.UUID
 import java.util.regex.Pattern
 import play.api.libs.json._
 import scala.util.control.Exception.catching
-import support.JsonMapping._
 
 trait Identifier {
   def uuid: UUID

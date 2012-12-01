@@ -12,7 +12,7 @@ import play.api.data.validation.Constraints._
 import play.api.http.HeaderNames
 import play.api.mvc._
 import scala.annotation.tailrec
-import support.Mappings._
+import support.Forms._
 
 object UsersController extends UsersController(Global.persistence.memoryImage)
 class UsersController(override val memoryImage: MemoryImage[State, UserEvent]) extends ApplicationController[UserEvent] {
