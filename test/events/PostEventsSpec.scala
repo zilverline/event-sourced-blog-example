@@ -6,6 +6,7 @@ import org.joda.time.DateTimeUtils
 import org.scalacheck._, Arbitrary.arbitrary, Prop.forAll
 import play.api.libs.json._
 import IdentifierSpec._
+import Generators._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
@@ -69,22 +70,11 @@ object PostEventsSpec {
         added :: deleted
       }
     }).map(_.flatten)
-    e <- interleave(edits, comments)
+    e <- interleaved(edits, comments)
     deleted <- Gen.frequency(3 -> Nil, 1 -> List(PostDeleted(id)))
   } yield added :: e ::: deleted)
 
   val eventsForMultiplePosts: Arbitrary[List[PostEvent]] = Arbitrary(for {
     events <- Gen.resize(10, Gen.listOf(arbitrary[PostId].flatMap { id => Gen.resize(5, arbitrary(eventsForSinglePost(id))) }))
   } yield events.flatten)
-
-  private[this] def interleave[T](a: List[T], b: List[T]): Gen[List[T]] = {
-    if (a.isEmpty) Gen.value(b)
-    else if (b.isEmpty) Gen.value(a)
-    else for {
-      (first, second) <- Gen.oneOf(Seq((a, b), (b, a)))
-      rest <- interleave(first.tail, second)
-    } yield {
-      first.head :: rest
-    }
-  }
 }

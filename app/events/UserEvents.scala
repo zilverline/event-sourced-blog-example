@@ -6,6 +6,7 @@ import eventstore.EventStreamType
 import eventstore.JsonMapping._
 import java.util.UUID
 import play.api.libs.json.Format
+import scala.util.control.Exception.catching
 
 /**
  * Strongly typed identifier for users.
@@ -14,16 +15,21 @@ case class UserId(uuid: UUID) extends Identifier
 object UserId extends IdentifierCompanion[UserId]("UserId")
 
 case class EmailAddress(value: String) {
-  require(value.matches(".+@.+"), "not a valid email address: " + value)
+  require(value matches """.+@.+\..+""", "invalid email address: " + value)
 
   override def toString = value
 }
 object EmailAddress {
+  def fromString(s: String): Option[EmailAddress] = catching(classOf[IllegalArgumentException]) opt EmailAddress(s)
+
   implicit val EmailAddressFormat: Format[EmailAddress] = valueFormat(EmailAddress.apply)(EmailAddress.unapply)
 }
 
+/**
+ * Hashed passwords that avoid leaking the contents when converted to strings.
+ */
 case class Password private (hash: String) {
-  require(hash.startsWith("$s0$"), "Are you sure you passed in the password hash?")
+  require(hash.startsWith("$s0$"), "invalid password hash")
 
   def verify(password: String): Boolean = SCryptUtil.check(password, hash)
 
@@ -36,14 +42,17 @@ object Password {
   implicit val PasswordFormat: Format[Password] = valueFormat(Password.fromHash)(Password.unapply)
 }
 
+/**
+ * Authentication tokens used to track logged-in users. Represented as 128-bit randomly generated numbers.
+ */
 case class AuthenticationToken private (a: Long, b: Long) {
   override def toString = "%016x-%016x".format(a, b)
 }
 object AuthenticationToken {
   def generate(): AuthenticationToken = AuthenticationToken(Random.nextLong, Random.nextLong)
 
-  def apply(s: String): AuthenticationToken = fromString(s) getOrElse {
-    throw new IllegalArgumentException("invalid authentication token '%s'".format(s))
+  def apply(value: String): AuthenticationToken = fromString(value) getOrElse {
+    throw new IllegalArgumentException("invalid authentication token '%s'".format(value))
   }
   def fromString(s: String): Option[AuthenticationToken] = s match {
     case Pattern(a, b) => Some(AuthenticationToken(BigInt(a, 16).longValue, BigInt(b, 16).longValue))
@@ -56,6 +65,9 @@ object AuthenticationToken {
   private[this] val Random = new java.security.SecureRandom()
 }
 
+/**
+ * User events.
+ */
 sealed trait UserEvent extends DomainEvent {
   def userId: UserId
 }
