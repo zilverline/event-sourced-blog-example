@@ -8,6 +8,8 @@ import org.joda.time.DateTimeUtils
 import play.api._
 import play.api.libs.json._
 import play.api.Play.current
+import _root_.redis.clients.jedis.Jedis
+import support.RedisEmailRegistry
 
 object Global extends GlobalSettings {
   object persistence {
@@ -34,6 +36,18 @@ object Global extends GlobalSettings {
     val memoryImage = MemoryImage[State, DomainEvent](eventStore)(State()) {
       (state, commit) => state.updateMany(commit.eventsWithRevision)
     }
+  }
+
+  lazy val emailAddressRegistry: EmailAddress => UserId = {
+    val config = Play.configuration.getConfig("email-registry").getOrElse(throw Play.configuration.globalError("missing [email-registry] configuration"))
+
+    val redisHost = config.getString("redis.host").getOrElse(throw config.globalError("missing key [email-registry.redis.host]"))
+    val redisPort = config.getInt("redis.port").getOrElse(redis.RedisEventStore.DEFAULT_PORT)
+    val redisKey = config.getString("redis.key").getOrElse(throw config.globalError("missing key [email-registry.redis.key]"))
+
+    val jedis = new Jedis(redisHost, redisPort)
+
+    RedisEmailRegistry.claim(jedis, redisKey)
   }
 
   override def onStart(app: Application) {

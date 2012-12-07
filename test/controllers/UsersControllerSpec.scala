@@ -19,6 +19,7 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
 
   "users controller" should {
     "register a new user" in new fixture {
+      claimedUserIds += email -> userId
       val request = FakeRequest().withFormUrlEncodedBody("email" -> "john@example.com", "password.1" -> "password", "password.2" -> "password")
 
       val result = subject.register.submit(request)
@@ -27,6 +28,7 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
       val user = users.get(EmailAddress("john@example.com")) getOrElse { failure("user not registered") }
       user.emailAddress must_== EmailAddress("john@example.com")
       user.password.verify("password") aka "password verified" must beTrue
+      user.userId aka "claimed user id" must_== userId
     }
 
     "allow registered user to log in" in new fixture {
@@ -54,13 +56,14 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
   trait fixture extends After { self =>
     Play.start(FakeApplication())
 
+    val claimedUserIds = collection.mutable.Map.empty[EmailAddress, UserId]
     val eventStore: EventStore[UserEvent] = new fake.FakeEventStore
 
     val memoryImage = MemoryImage[State, UserEvent](eventStore)(State()) {
       (state, commit) => state.updateMany(commit.eventsWithRevision)
     }
 
-    val subject = new UsersController(memoryImage)
+    val subject = new UsersController(memoryImage, email => claimedUserIds.getOrElseUpdate(email, UserId.generate()))
 
     def given(events: UserEvent*)(implicit eventStreamType: EventStreamType[UserId, UserEvent]) {
       for (event <- events) {

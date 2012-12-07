@@ -14,8 +14,8 @@ import play.api.mvc._
 import scala.annotation.tailrec
 import support.Forms._
 
-object UsersController extends UsersController(Global.persistence.memoryImage)
-class UsersController(override val memoryImage: MemoryImage[State, UserEvent]) extends ApplicationController[UserEvent] {
+object UsersController extends UsersController(Global.persistence.memoryImage, Global.emailAddressRegistry)
+class UsersController(override val memoryImage: MemoryImage[State, UserEvent], registerEmailAddress: EmailAddress => UserId) extends ApplicationController[UserEvent] {
   object authentication {
     def authenticate(users: Users)(login: EmailAddress, password: String): Option[(User, AuthenticationToken)] =
       users.get(login).filter(_.password.verify(password)).map { user => (user, AuthenticationToken.generate) }
@@ -78,19 +78,18 @@ class UsersController(override val memoryImage: MemoryImage[State, UserEvent]) e
       registrationForm.bindFromRequest.fold(
         formWithErrors =>
           BadRequest(views.html.users.register(formWithErrors)),
-        registration => memoryImage.modify { state =>
-          val userId = UserId.generate()
-          Changes(StreamRevision.Initial, UserRegistered(userId, registration._1, registration._2): UserEvent).commit(
-            onCommit = Redirect(routes.UsersController.register.registered),
-            onConflict = conflict => sys.error("conflict"))
+        registration => {
+          val (email, password) = registration
+          val userId = registerEmailAddress(email)
+          memoryImage.modify { _ =>
+            Changes(StreamRevision.Initial, UserRegistered(userId, email, password): UserEvent).commit(
+              onCommit = Redirect(routes.UsersController.register.registered),
+              onConflict = conflict => sys.error("conflict"))
+          }
         })
     }
     def registered = ApplicationAction { implicit request =>
-        request.currentUser map { user =>
-          Ok(views.html.users.registered(user))
-        } getOrElse {
-          NotFound(views.html.defaultpages.notFound(request, None))
-        }
+      Ok(views.html.users.registered())
     }
   }
 
