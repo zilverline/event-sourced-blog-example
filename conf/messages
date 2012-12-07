@@ -10,3 +10,5 @@ password.2=Confirm Password
 
 # Form validation errors.
 error.password.mismatch=Passwords do no match
+bad.credentials=Your email and password did not match a known account
+duplicate.account=This email address is already registered

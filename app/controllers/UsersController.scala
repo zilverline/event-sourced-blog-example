@@ -27,18 +27,22 @@ class UsersController(override val memoryImage: MemoryImage[State, UserEvent], r
     def show = ApplicationAction { implicit request => Ok(views.html.users.log_in(loginForm)) }
 
     def submit = ApplicationAction { implicit request =>
-      loginForm.bindFromRequest.fold(
-        formWithErrors => BadRequest(views.html.users.log_in(formWithErrors)),
-        authentication => memoryImage.modify { state =>
-          authenticate(state.users)(authentication._1, authentication._2) map {
-            case (user, token) =>
-              Changes(user.revision, UserLoggedIn(user.userId, token): UserEvent).commit(
-                onCommit = Redirect(routes.UsersController.authentication.loggedIn).withSession("authenticationToken" -> token.toString),
-                onConflict = conflict => sys.error("conflict"))
-          } getOrElse {
-            abort(BadRequest(views.html.users.log_in(loginForm.copy(errors = Seq(FormError("", "Your email and password did not match a known account."))))))
-          }
-        })
+      val form = loginForm.bindFromRequest
+      form.fold(
+        formWithErrors =>
+          BadRequest(views.html.users.log_in(formWithErrors)),
+        credentials =>
+          memoryImage.modify { state =>
+            val (email, password) = credentials
+            authenticate(state.users)(email, password) map {
+              case (user, token) =>
+                Changes(user.revision, UserLoggedIn(user.userId, token): UserEvent).commit(
+                  onCommit = Redirect(routes.UsersController.authentication.loggedIn).withSession("authenticationToken" -> token.toString),
+                  onConflict = conflict => sys.error("impossible conflict: " + conflict))
+            } getOrElse {
+              abort(BadRequest(views.html.users.log_in(form.addError(FormError("", "bad.credentials")))))
+            }
+          })
     }
 
     def logOut = ApplicationAction { implicit request =>
@@ -46,7 +50,7 @@ class UsersController(override val memoryImage: MemoryImage[State, UserEvent], r
         memoryImage.modify { state =>
           Changes(user.revision, UserLoggedOut(user.userId): UserEvent).commit(
             onCommit = Redirect(routes.UsersController.authentication.loggedOut).withNewSession,
-            onConflict = conflict => sys.error("conflict"))
+            onConflict = conflict => sys.error("impossible conflict: " + conflict))
         }
       } getOrElse {
         Redirect(routes.UsersController.authentication.loggedOut).withNewSession
@@ -76,7 +80,8 @@ class UsersController(override val memoryImage: MemoryImage[State, UserEvent], r
       Ok(views.html.users.register(registrationForm))
     }
     def submit = ApplicationAction { implicit request =>
-      registrationForm.bindFromRequest.fold(
+      val form = registrationForm.bindFromRequest
+      form.fold(
         formWithErrors =>
           BadRequest(views.html.users.register(formWithErrors)),
         registration => {
@@ -85,7 +90,7 @@ class UsersController(override val memoryImage: MemoryImage[State, UserEvent], r
           memoryImage.modify { _ =>
             Changes(StreamRevision.Initial, UserRegistered(userId, email, displayName, password): UserEvent).commit(
               onCommit = Redirect(routes.UsersController.register.registered),
-              onConflict = conflict => sys.error("conflict"))
+              onConflict = _ => BadRequest(views.html.users.register(form.addError(FormError("", "duplicate.account")))))
           }
         })
     }

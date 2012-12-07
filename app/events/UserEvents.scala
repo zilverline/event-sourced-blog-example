@@ -78,7 +78,10 @@ case class UserLoggedOut(userId: UserId) extends UserEvent
 
 object UserEvent {
   implicit val UserEventDescriptor: EventStreamType[UserId, UserEvent] = EventStreamType(_.toString, _.userId)
-  implicit val UserEventConflictsWith: ConflictsWith[UserEvent] = ConflictsWith { case _ => true }
+  implicit val UserEventConflictsWith: ConflictsWith[UserEvent] = ConflictsWith {
+    case (_: UserRegistered, _) => true
+    case _                      => false
+  }
 
   implicit val UserEventFormat: TypeChoiceFormat[UserEvent] = TypeChoiceFormat(
     "UserRegistered" -> objectFormat("userId", "login", "displayName", "password")(UserRegistered.apply)(UserRegistered.unapply),
