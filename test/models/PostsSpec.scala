@@ -47,7 +47,7 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
       }
     }
 
-    val CommentContent_1 = CommentContent("Commenter", "Body 1")
+    val CommentContent_1 = CommentContent(Right("Commenter"), "Body 1")
     "track comments and the next comment id" in {
       given events (PostAdded(A, Author, Content), CommentAdded(A, CommentId(1), CommentContent_1)) thenPostWithId A must beSome(Post(A, StreamRevision(2), Author, AuthorDisplayName, Content, CommentId(2), SortedMap(CommentId(1) -> CommentContent_1)))
       given events (PostAdded(A, Author, Content), CommentAdded(A, CommentId(1), CommentContent_1), CommentDeleted(A, CommentId(1))) thenPostWithId A must beSome(Post(A, StreamRevision(3), Author, AuthorDisplayName, Content, CommentId(2), SortedMap.empty))

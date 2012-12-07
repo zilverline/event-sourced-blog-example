@@ -32,7 +32,11 @@
     @globalErrorsPanel(form)
     @conflictsMessagePanel(conflicts)
     <fieldset>
-      @helper.inputText(form("commenter"), '_label -> "Commenter", 'required -> "required")
+      @request.currentUser.map { user =>
+        <p>Logged in as <a href="#">@user.displayName</a>. <a href="@routes.UsersController.authentication.logOut">Log out</a>.</p>
+      }.getOrElse {
+        @helper.inputText(form("name"), '_label -> "Name", 'required -> "required")
+      }
       @helper.textarea(form("body"), '_label -> "Body", 'cols -> 80, 'rows -> 10)
     </fieldset>
 

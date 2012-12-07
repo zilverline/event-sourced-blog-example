@@ -109,9 +109,16 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
    * Add and delete comments.
    */
   object comments {
-    val commentContentForm = Form(mapping(
-      "commenter" -> trimmedText.verifying(minLength(3)),
-      "body"      -> trimmedText.verifying(minLength(3)))(CommentContent.apply)(CommentContent.unapply))
+    def commentContentForm(implicit request: ApplicationRequestHeader): Form[CommentContent] = Form(
+      request.currentUser.map { user =>
+        single("body" -> trimmedText.verifying(minLength(3))).transform[CommentContent](
+          body => CommentContent(Left(user.userId), body),
+          commentContent => commentContent.body)
+      }.getOrElse {
+        mapping(
+          "name" -> tokenizedText.verifying(minLength(3)).transform[Either[UserId, String]](Right.apply, v => v.right.getOrElse("")),
+          "body" -> trimmedText.verifying(minLength(3)))(CommentContent.apply)(CommentContent.unapply)
+      })
 
     def add(postId: PostId, expected: StreamRevision) = CommandAction { state => implicit request =>
       state.posts.get(postId) map { post =>
@@ -130,13 +137,12 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
     def delete(postId: PostId, expected: StreamRevision, commentId: CommentId) = CommandAction { state => implicit request =>
       state.posts.get(postId) map { post =>
         def deletedResult = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment deleted.")
-        post.comments.get(commentId) match {
-          case None =>
-            abort(deletedResult)
-          case Some(comment) =>
-            Changes(expected, CommentDeleted(postId, commentId): PostEvent).commit(
-              onCommit = deletedResult,
-              onConflict = conflict => Conflict(views.html.posts.show(post, commentContentForm, conflict.events)))
+        post.comments.get(commentId) map { comment =>
+          Changes(expected, CommentDeleted(postId, commentId): PostEvent).commit(
+            onCommit = deletedResult,
+            onConflict = conflict => Conflict(views.html.posts.show(post, commentContentForm, conflict.events)))
+        } getOrElse {
+          abort(deletedResult)
         }
       } getOrElse {
         abort(notFound)

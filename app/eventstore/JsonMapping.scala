@@ -68,6 +68,22 @@ object JsonMapping {
   implicit def typeAndFormatToChoiceMapping[A](typeAndFormat: (String, Format[A]))(implicit m: Manifest[A]): TypeChoiceMapping[A] = TypeChoiceMapping(typeAndFormat._1, typeAndFormat._2, m)
 
   /**
+   * Maps an `Either[A, B]` to a JSON object. When the mapped value is `Left(a)` the JSON object will
+   * have a single field named by the `left` parameter. Otherwise the JSON object contains a field
+   * named by the `right` parameter.
+   */
+  def eitherFormat[A: Format, B: Format](left: String, right: String): Format[Either[A, B]] = new Format[Either[A, B]] {
+    override def reads(json: JsValue) = (json \ left) match {
+      case JsUndefined(_) => Right((json \ right).as[B])
+      case a              => Left(a.as[A])
+    }
+    override def writes(o: Either[A, B]) = o match {
+      case Left(a)  => JsObject(Seq(left -> toJson(a)))
+      case Right(b) => JsObject(Seq(right -> toJson(b)))
+    }
+  }
+
+  /**
    * Maps an instance to a JSON object with a field named `a` using the provided `apply` and `unapply` functions.
    */
   def objectFormat[R, A: Format](a: String)(apply: A => R)(unapply: R => Option[A]): Format[R] = new Format[R] {

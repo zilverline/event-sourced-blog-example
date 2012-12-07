@@ -22,7 +22,7 @@ object CommentId {
  * Content that is always present for a blog post.
  */
 case class PostContent(title: String, body: String)
-case class CommentContent(commenter: String, body: String)
+case class CommentContent(commenter: Either[UserId, String], body: String)
 
 /**
  * Domain events defining the life-cycle of a blog post. Since domain events will
@@ -51,7 +51,8 @@ object PostEvent {
   implicit val PostEventStreamType: EventStreamType[PostId, PostEvent] = EventStreamType(_.toString, _.postId)
 
   implicit val PostContentFormat: Format[PostContent] = objectFormat("title", "body")(PostContent.apply)(PostContent.unapply)
-  implicit val CommentContentFormat: Format[CommentContent] = objectFormat("commenter", "body")(CommentContent.apply)(CommentContent.unapply)
+  implicit val CommentContentFormat: Format[CommentContent] =
+    objectFormat("commenter", "body")(CommentContent.apply)(CommentContent.unapply)(eitherFormat("userId", "name"), implicitly)
 
   implicit val PostEventFormat: TypeChoiceFormat[PostEvent] = TypeChoiceFormat(
     "PostAdded"      -> objectFormat("postId", "authorId", "content")(PostAdded.apply)(PostAdded.unapply),

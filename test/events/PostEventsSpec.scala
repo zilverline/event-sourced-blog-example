@@ -28,7 +28,7 @@ class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.Sc
   "Post comment event" should {
     val postId = PostId.generate
     val conflictsWith = implicitly[ConflictsWith[PostEvent]]
-    val commentAdded = CommentAdded(postId, CommentId(1), CommentContent("commenter", "body"))
+    val commentAdded = CommentAdded(postId, CommentId(1), CommentContent(Right("commenter"), "body"))
     val now = DateTimeUtils.currentTimeMillis
 
     def conflict(event: PostEvent) = Conflict(Seq(CommittedEvent(StoreRevision(1), now, postId.toString, StreamRevision(1), event)))
