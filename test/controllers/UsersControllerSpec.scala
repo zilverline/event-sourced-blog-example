@@ -14,13 +14,14 @@ import play.api.Play
 class UsersControllerSpec extends org.specs2.mutable.Specification {
   val userId = UserId.generate()
   val email = EmailAddress("john@example.com")
+  val displayName = "John Doe"
   val password = Password.fromPlainText("password")
   val authenticationToken = AuthenticationToken.generate
 
   "users controller" should {
     "register a new user" in new fixture {
       claimedUserIds += email -> userId
-      val request = FakeRequest().withFormUrlEncodedBody("email" -> "john@example.com", "password.1" -> "password", "password.2" -> "password")
+      val request = FakeRequest().withFormUrlEncodedBody("email" -> "john@example.com", "displayName" -> "John Doe", "password.1" -> "password", "password.2" -> "password")
 
       val result = subject.register.submit(request)
 
@@ -32,7 +33,7 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
     }
 
     "allow registered user to log in" in new fixture {
-      given(UserRegistered(userId, email, password))
+      given(UserRegistered(userId, email, displayName, password))
 
       val result = subject.authentication.submit(FakeRequest().withFormUrlEncodedBody("email" -> email.value, "password" -> "password"))
 
@@ -43,7 +44,7 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
     }
 
     "allow logged in users to log out" in new fixture {
-      given(UserRegistered(userId, email, password), UserLoggedIn(userId, authenticationToken))
+      given(UserRegistered(userId, email, displayName, password), UserLoggedIn(userId, authenticationToken))
 
       val result = subject.authentication.logOut(FakeRequest().withSession("authenticationToken" -> authenticationToken.toString))
 

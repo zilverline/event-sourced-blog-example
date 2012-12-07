@@ -67,8 +67,9 @@ class UsersController(override val memoryImage: MemoryImage[State, UserEvent], r
     /**
      * Registration form.
      */
-    val registrationForm: Form[(EmailAddress, Password)] = Form(tuple(
+    val registrationForm: Form[(EmailAddress, String, Password)] = Form(tuple(
       "email" -> email.transform[EmailAddress](EmailAddress.apply, _.value),
+      "displayName" -> tokenizedText.verifying(minLength(2)),
       "password" -> confirmPasswordMapping))
 
     def show = ApplicationAction { implicit request =>
@@ -79,10 +80,10 @@ class UsersController(override val memoryImage: MemoryImage[State, UserEvent], r
         formWithErrors =>
           BadRequest(views.html.users.register(formWithErrors)),
         registration => {
-          val (email, password) = registration
+          val (email, displayName, password) = registration
           val userId = registerEmailAddress(email)
           memoryImage.modify { _ =>
-            Changes(StreamRevision.Initial, UserRegistered(userId, email, password): UserEvent).commit(
+            Changes(StreamRevision.Initial, UserRegistered(userId, email, displayName, password): UserEvent).commit(
               onCommit = Redirect(routes.UsersController.register.registered),
               onConflict = conflict => sys.error("conflict"))
           }

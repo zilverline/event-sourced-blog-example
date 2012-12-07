@@ -71,7 +71,7 @@ object AuthenticationToken {
 sealed trait UserEvent extends DomainEvent {
   def userId: UserId
 }
-case class UserRegistered(userId: UserId, login: EmailAddress, password: Password) extends UserEvent
+case class UserRegistered(userId: UserId, login: EmailAddress, displayName: String, password: Password) extends UserEvent
 case class UserPasswordChanged(userId: UserId, password: Password) extends UserEvent
 case class UserLoggedIn(userId: UserId, token: AuthenticationToken) extends UserEvent
 case class UserLoggedOut(userId: UserId) extends UserEvent
@@ -81,7 +81,7 @@ object UserEvent {
   implicit val UserEventConflictsWith: ConflictsWith[UserEvent] = ConflictsWith { case _ => true }
 
   implicit val UserEventFormat: TypeChoiceFormat[UserEvent] = TypeChoiceFormat(
-    "UserRegistered" -> objectFormat("userId", "login", "password")(UserRegistered.apply)(UserRegistered.unapply),
+    "UserRegistered" -> objectFormat("userId", "login", "displayName", "password")(UserRegistered.apply)(UserRegistered.unapply),
     "UserPasswordChanged" -> objectFormat("userId", "password")(UserPasswordChanged.apply)(UserPasswordChanged.unapply),
     "UserLoggedIn" -> objectFormat("userId", "authenticationToken")(UserLoggedIn.apply)(UserLoggedIn.unapply),
     "UserLoggedOut" -> objectFormat("userId")(UserLoggedOut.apply)(UserLoggedOut.unapply))

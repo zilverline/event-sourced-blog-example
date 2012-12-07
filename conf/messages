@@ -3,6 +3,7 @@ author=Author
 title=Title
 body=Body
 email=Email
+displayName=Display name
 password=Password
 password.1=Choose Password
 password.2=Confirm Password

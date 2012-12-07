@@ -75,7 +75,7 @@ object UserEventsSpec {
   } yield login :: logout
 
   def eventsForSingleUser(id: UserId): Arbitrary[List[UserEvent]] = Arbitrary(for {
-    registered <- Gen.resultOf(UserRegistered(id, _: EmailAddress, _: Password))
+    registered <- Gen.resultOf(UserRegistered(id, _: EmailAddress, _: String, _: Password))
     passwordChanges <- Gen.resize(2, Gen.listOf(Gen.resultOf(UserPasswordChanged(id, _: Password))))
     logins <- Gen.resize(5, Gen.listOf(loginWithOptionalLogout(id)).map(_.flatten))
     events <- interleaved(passwordChanges, logins)

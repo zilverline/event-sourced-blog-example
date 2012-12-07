@@ -1,4 +1,4 @@
-@(form: Form[(Email, Password)], conflicts: Seq[UserEvent] = Nil)(implicit request: ApplicationRequestHeader)
+@(form: Form[(EmailAddress, String, Password)], conflicts: Seq[UserEvent] = Nil)(implicit request: ApplicationRequestHeader)
 @import views.support._
 
 @main("Register") {
@@ -6,6 +6,7 @@
     @globalErrorsPanel(form)
     <fieldset>
       @helper.inputText(form("email"), '_label -> Messages("email"), 'autofocus -> "autofocus", 'required -> "required")
+      @helper.inputText(form("displayName"), '_label -> Messages("displayName"), 'required -> "required")
       @helper.inputPassword(form("password")("1"), '_label -> Messages("password.1"), 'required -> "required")
       @helper.inputPassword(form("password")("2"), '_label -> Messages("password.2"), 'required -> "required")
     </fieldset>

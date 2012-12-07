@@ -14,44 +14,45 @@ class UsersSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
     val emailAddress = EmailAddress("john@example.com")
     val password = Password.fromPlainText("password")
     val password2 = Password.fromPlainText("password2")
+    val displayName = "John Doe"
     val authenticationToken = AuthenticationToken.generate()
     val authenticationToken2 = AuthenticationToken.generate()
 
     "contain registered users" in {
-      val users = given(UserRegistered(A, emailAddress, password))
+      val users = given(UserRegistered(A, emailAddress, displayName, password))
 
-      users.byId.get(A) must beSome(User(A, StreamRevision(1), emailAddress, password))
+      users.byId.get(A) must beSome(User(A, StreamRevision(1), emailAddress, displayName, password))
     }
 
     "store most recent password for user" in {
-      val users = given(UserRegistered(A, emailAddress, password), UserPasswordChanged(A, password2))
+      val users = given(UserRegistered(A, emailAddress, displayName, password), UserPasswordChanged(A, password2))
 
-      users.byId.get(A) must beSome(User(A, StreamRevision(2), emailAddress, password2))
+      users.byId.get(A) must beSome(User(A, StreamRevision(2), emailAddress, displayName, password2))
     }
 
     "track current authentication token when logged in" in {
-      val users = given(UserRegistered(A, emailAddress, password), UserLoggedIn(A, authenticationToken))
+      val users = given(UserRegistered(A, emailAddress, displayName, password), UserLoggedIn(A, authenticationToken))
 
       users.byAuthenticationToken.get(authenticationToken) must beSome(A)
-      users.byId.get(A) must beSome(User(A, StreamRevision(2), emailAddress, password, Some(authenticationToken)))
+      users.byId.get(A) must beSome(User(A, StreamRevision(2), emailAddress, displayName, password, Some(authenticationToken)))
     }
 
     "remove current authentication token logged out" in {
-      val users = given(UserRegistered(A, emailAddress, password), UserLoggedIn(A, authenticationToken), UserLoggedOut(A))
+      val users = given(UserRegistered(A, emailAddress, displayName, password), UserLoggedIn(A, authenticationToken), UserLoggedOut(A))
 
       users.byAuthenticationToken.get(authenticationToken) must beNone
-      users.byId.get(A) must beSome(User(A, StreamRevision(3), emailAddress, password, None))
+      users.byId.get(A) must beSome(User(A, StreamRevision(3), emailAddress, displayName, password, None))
     }
 
     "remove previous authentication token when when logged in again" in {
       val users = given(
-        UserRegistered(A, emailAddress, password),
+        UserRegistered(A, emailAddress, displayName, password),
         UserLoggedIn(A, authenticationToken),
         UserLoggedIn(A, authenticationToken2))
 
       users.byAuthenticationToken.get(authenticationToken) must beNone
       users.byAuthenticationToken.get(authenticationToken2) must beSome(A)
-      users.byId.get(A) must beSome(User(A, StreamRevision(3), emailAddress, password, Some(authenticationToken2)))
+      users.byId.get(A) must beSome(User(A, StreamRevision(3), emailAddress, displayName, password, Some(authenticationToken2)))
     }
 
     "load from history" in forAll(UserEventsSpec.eventsForMultipleUsers.arbitrary) { events =>
