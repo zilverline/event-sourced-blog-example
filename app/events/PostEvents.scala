@@ -21,7 +21,7 @@ object CommentId {
 /**
  * Content that is always present for a blog post.
  */
-case class PostContent(author: String, title: String, body: String)
+case class PostContent(title: String, body: String)
 case class CommentContent(commenter: String, body: String)
 
 /**
@@ -32,7 +32,7 @@ case class CommentContent(commenter: String, body: String)
 sealed trait PostEvent extends DomainEvent {
   def postId: PostId
 }
-case class PostAdded(postId: PostId, content: PostContent) extends PostEvent
+case class PostAdded(postId: PostId, author: UserId, content: PostContent) extends PostEvent
 case class PostEdited(postId: PostId, content: PostContent) extends PostEvent
 case class PostDeleted(postId: PostId) extends PostEvent
 sealed trait PostCommentEvent extends PostEvent {
@@ -50,11 +50,11 @@ object PostEvent {
 
   implicit val PostEventStreamType: EventStreamType[PostId, PostEvent] = EventStreamType(_.toString, _.postId)
 
-  implicit val PostContentFormat: Format[PostContent] = objectFormat("author", "title", "body")(PostContent.apply)(PostContent.unapply)
+  implicit val PostContentFormat: Format[PostContent] = objectFormat("title", "body")(PostContent.apply)(PostContent.unapply)
   implicit val CommentContentFormat: Format[CommentContent] = objectFormat("commenter", "body")(CommentContent.apply)(CommentContent.unapply)
 
   implicit val PostEventFormat: TypeChoiceFormat[PostEvent] = TypeChoiceFormat(
-    "PostAdded"      -> objectFormat("postId", "content")(PostAdded.apply)(PostAdded.unapply),
+    "PostAdded"      -> objectFormat("postId", "author", "content")(PostAdded.apply)(PostAdded.unapply),
     "PostEdited"     -> objectFormat("postId", "content")(PostEdited.apply)(PostEdited.unapply),
     "PostDeleted"    -> objectFormat("postId")(PostDeleted.apply)(PostDeleted.unapply),
     "CommentAdded"   -> objectFormat("postId", "commentId", "content")(CommentAdded.apply)(CommentAdded.unapply),

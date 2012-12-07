@@ -17,7 +17,6 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
    * Blog content form definition.
    */
   val postContentForm = Form(mapping(
-    "author" -> trimmedText.verifying(minLength(3)),
     "title"  -> trimmedText.verifying(minLength(3)),
     "body"   -> trimmedText.verifying(minLength(3)))(PostContent.apply)(PostContent.unapply))
 
@@ -47,16 +46,18 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
       Ok(views.html.posts.add(PostId.generate(), postContentForm))
     }
 
-    def submit(id: PostId) = ApplicationAction { implicit request =>
-      postContentForm.bindFromRequest.fold(
-        formWithErrors =>
-          BadRequest(views.html.posts.add(id, formWithErrors)),
-        postContent =>
-          memoryImage.modify { _ =>
-            Changes(StreamRevision.Initial, PostAdded(id, postContent): PostEvent).commit(
-              onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post added."),
-              onConflict = conflict => Conflict(views.html.posts.edit(id, conflict.actual, postContentForm.fill(postContent), conflict.events)))
-          })
+    def submit(id: PostId) = CommandAction { state => implicit request =>
+      request.currentUser map { user =>
+          postContentForm.bindFromRequest.fold(
+            formWithErrors =>
+              abort(BadRequest(views.html.posts.add(id, formWithErrors))),
+            postContent =>
+              Changes(StreamRevision.Initial, PostAdded(id, user.userId, postContent): PostEvent).commit(
+                onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post added."),
+                onConflict = conflict => Conflict(views.html.posts.edit(id, conflict.actual, postContentForm.fill(postContent), conflict.events))))
+      } getOrElse {
+        abort(Unauthorized)
+      }
     }
   }
 

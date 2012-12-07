@@ -18,8 +18,8 @@ class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.Sc
     }
 
     "parse example Post Added event" in {
-      val event = PostAdded(PostId(UUID.fromString("5ab11526-477b-43b9-8fe6-4bb25a3dfcc6")), PostContent(author = "Author", title = "Title", body = "Body"))
-      val json = """{"type":"PostAdded","data":{"postId":"5ab11526-477b-43b9-8fe6-4bb25a3dfcc6","content":{"author":"Author","title":"Title","body":"Body"}}}"""
+      val event = PostAdded(PostId(UUID.fromString("5ab11526-477b-43b9-8fe6-4bb25a3dfcc6")), UserId(UUID.fromString("5ab11526-477b-43b9-8fe6-4bb25a3dfcc5")), PostContent(title = "Title", body = "Body"))
+      val json = """{"type":"PostAdded","data":{"postId":"5ab11526-477b-43b9-8fe6-4bb25a3dfcc6","author":"5ab11526-477b-43b9-8fe6-4bb25a3dfcc5", "content":{"author":"Author","title":"Title","body":"Body"}}}"""
 
       Json.fromJson[PostEvent](Json.parse(json)) must_== event
     }
@@ -48,7 +48,7 @@ class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.Sc
     "conflict with other post events" in {
       conflictsWith.conflicting(
         conflict(PostDeleted(postId)),
-        Seq(PostEdited(postId, PostContent(author = "Author", title = "Title", body = "Body")))) must beSome(conflict(PostDeleted(postId)))
+        Seq(PostEdited(postId, PostContent(title = "Title", body = "Body")))) must beSome(conflict(PostDeleted(postId)))
     }
   }
 }
@@ -58,7 +58,7 @@ object PostEventsSpec {
   implicit val arbitraryCommentContent: Arbitrary[CommentContent] = Arbitrary(Gen.resultOf(CommentContent.apply _))
 
   def eventsForSinglePost(id: PostId): Arbitrary[List[PostEvent]] = Arbitrary(for {
-    added <- Gen.resultOf(PostAdded(id, _: PostContent))
+    added <- Gen.resultOf(PostAdded(id, _: UserId, _: PostContent))
     edits <- Gen.resize(10, Gen.listOf(Gen.resultOf(PostEdited(id, _: PostContent))))
     commentCount <- Gen.chooseNum(0, 5)
     comments <- Gen.sequence[List, List[PostCommentEvent]](List.tabulate(commentCount) { i =>

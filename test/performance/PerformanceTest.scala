@@ -61,10 +61,9 @@ object PerformanceTest extends App with Instrumented {
       new String(Array.fill(random.nextInt(max - min) + min)(random.nextPrintableChar))
     }
     val id = PostId.generate
-    val author = randomAsciiString(10, 40)
     val title = randomAsciiString(10, 90)
     val content = randomAsciiString(250, 600)
-    (id -> PostContent(author, title, content))
+    (id -> PostContent(title, content))
   }
 
   println("%-10s: %8s, %8s, %8s, %8s, %8s, %8s, %8s, %8s, %8s, %8s".

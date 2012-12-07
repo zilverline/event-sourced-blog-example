@@ -10,6 +10,7 @@ import scala.collection.immutable.SortedMap
 case class Post(
   id: PostId,
   revision: StreamRevision,
+  author: UserId,
   content: PostContent,
   nextCommentId: CommentId = CommentId(1),
   comments: SortedMap[CommentId, CommentContent] = SortedMap.empty)
@@ -22,8 +23,8 @@ case class Posts(byId: Map[PostId, Post] = Map.empty, orderedByTimeAdded: Seq[Po
   def mostRecent(n: Int): Seq[Post] = orderedByTimeAdded.takeRight(n).reverse.map(byId)
 
   def update(event: PostEvent, revision: StreamRevision): Posts = event match {
-    case PostAdded(id, content) =>
-      this.copy(byId = byId.updated(id, Post(id, revision, content)), orderedByTimeAdded = orderedByTimeAdded :+ id)
+    case PostAdded(id, author, content) =>
+      this.copy(byId = byId.updated(id, Post(id, revision, author, content)), orderedByTimeAdded = orderedByTimeAdded :+ id)
     case PostDeleted(id) =>
       this.copy(byId = byId - id, orderedByTimeAdded = orderedByTimeAdded.par.filterNot(_ == id).seq)
     case PostEdited(id, content) =>

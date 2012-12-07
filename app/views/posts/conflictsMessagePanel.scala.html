@@ -8,7 +8,7 @@
         <li>
         @conflict match {
           case _: PostAdded => { The post was added. }
-          case event: PostEdited => { The post was edited by @event.content.author. }
+          case event: PostEdited => { The post was edited. }
           case _: PostDeleted => { The post was deleted. }
           case event: CommentAdded => { A comment was added by @event.content.commenter. }
           case _: CommentDeleted => { A comment was deleted. }
