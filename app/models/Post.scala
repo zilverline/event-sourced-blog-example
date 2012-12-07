@@ -3,6 +3,7 @@ package models
 import events._
 import eventstore.StreamRevision
 import scala.collection.immutable.SortedMap
+import controllers.ApplicationRequestHeader
 
 /**
  * A specific blog post with its current revision and content.
@@ -10,10 +11,14 @@ import scala.collection.immutable.SortedMap
 case class Post(
   id: PostId,
   revision: StreamRevision,
-  author: UserId,
+  authorId: UserId,
+  authorDisplayName: String,
   content: PostContent,
   nextCommentId: CommentId = CommentId(1),
-  comments: SortedMap[CommentId, CommentContent] = SortedMap.empty)
+  comments: SortedMap[CommentId, CommentContent] = SortedMap.empty) {
+
+  def isAuthoredByCurrentUser(implicit request: ApplicationRequestHeader) = request.currentUser.exists(_.isAuthorOf(this))
+}
 
 /**
  * The current state of blog posts, derived from all committed PostEvents.
@@ -22,9 +27,9 @@ case class Posts(byId: Map[PostId, Post] = Map.empty, orderedByTimeAdded: Seq[Po
   def get(id: PostId): Option[Post] = byId.get(id)
   def mostRecent(n: Int): Seq[Post] = orderedByTimeAdded.takeRight(n).reverse.map(byId)
 
-  def update(event: PostEvent, revision: StreamRevision): Posts = event match {
-    case PostAdded(id, author, content) =>
-      this.copy(byId = byId.updated(id, Post(id, revision, author, content)), orderedByTimeAdded = orderedByTimeAdded :+ id)
+  def update(event: PostEvent, revision: StreamRevision, findUser: UserId => Option[User]): Posts = event match {
+    case PostAdded(id, authorId, content) =>
+      this.copy(byId = byId.updated(id, Post(id, revision, authorId, findUser(authorId).map(_.displayName).getOrElse("Unknown"), content)), orderedByTimeAdded = orderedByTimeAdded :+ id)
     case PostDeleted(id) =>
       this.copy(byId = byId - id, orderedByTimeAdded = orderedByTimeAdded.par.filterNot(_ == id).seq)
     case PostEdited(id, content) =>

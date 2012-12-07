@@ -32,7 +32,7 @@ case class CommentContent(commenter: String, body: String)
 sealed trait PostEvent extends DomainEvent {
   def postId: PostId
 }
-case class PostAdded(postId: PostId, author: UserId, content: PostContent) extends PostEvent
+case class PostAdded(postId: PostId, authorId: UserId, content: PostContent) extends PostEvent
 case class PostEdited(postId: PostId, content: PostContent) extends PostEvent
 case class PostDeleted(postId: PostId) extends PostEvent
 sealed trait PostCommentEvent extends PostEvent {
@@ -54,7 +54,7 @@ object PostEvent {
   implicit val CommentContentFormat: Format[CommentContent] = objectFormat("commenter", "body")(CommentContent.apply)(CommentContent.unapply)
 
   implicit val PostEventFormat: TypeChoiceFormat[PostEvent] = TypeChoiceFormat(
-    "PostAdded"      -> objectFormat("postId", "author", "content")(PostAdded.apply)(PostAdded.unapply),
+    "PostAdded"      -> objectFormat("postId", "authorId", "content")(PostAdded.apply)(PostAdded.unapply),
     "PostEdited"     -> objectFormat("postId", "content")(PostEdited.apply)(PostEdited.unapply),
     "PostDeleted"    -> objectFormat("postId")(PostDeleted.apply)(PostDeleted.unapply),
     "CommentAdded"   -> objectFormat("postId", "commentId", "content")(CommentAdded.apply)(CommentAdded.unapply),

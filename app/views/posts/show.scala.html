@@ -3,9 +3,11 @@
 
 @main(post.content.title) {
   <div class="well">
-    <p>@post.content.body -- <em>by @post.author</em></p>
+    <p>@post.content.body -- <em>by @post.authorDisplayName</em></p>
     <div class="btn-group">
-      <a class="btn" href="@routes.PostsController.edit.show(post.id)">Edit...</a>
+      @if(post.isAuthoredByCurrentUser) {
+        <a class="btn" href="@routes.PostsController.edit.show(post.id)">Edit</a>
+      }
       <a class="btn" href="@routes.PostsController.index()">Back</a>
     </div>
   </div>

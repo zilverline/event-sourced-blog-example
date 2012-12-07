@@ -66,13 +66,15 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
    */
   object edit {
     def show(id: PostId) = QueryAction { state => implicit request =>
-      state.posts.get(id) map { post =>
+      state.posts.get(id).filter(_.isAuthoredByCurrentUser) map { post =>
         Ok(views.html.posts.edit(post.id, post.revision, postContentForm.fill(post.content)))
-      } getOrElse notFound
+      } getOrElse {
+        notFound
+      }
     }
 
     def submit(id: PostId, expected: StreamRevision) = CommandAction { state => implicit request =>
-      state.posts.get(id) map { post =>
+      state.posts.get(id).filter(_.isAuthoredByCurrentUser) map { post =>
         postContentForm.bindFromRequest.fold(
           formWithErrors =>
             abort(BadRequest(views.html.posts.edit(id, expected, formWithErrors))),
@@ -92,9 +94,12 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
   def delete(id: PostId, expected: StreamRevision) = CommandAction { state => implicit request =>
     def deletedResult = Redirect(routes.PostsController.index).flashing("info" -> "Post deleted.")
     state.posts.get(id) map { post =>
-      Changes(expected, PostDeleted(id): PostEvent).commit(
-        onCommit = deletedResult,
-        onConflict = conflict => Conflict(views.html.posts.index(state.posts.mostRecent(20), conflict.events)))
+      if (post.isAuthoredByCurrentUser)
+        Changes(expected, PostDeleted(id): PostEvent).commit(
+          onCommit = deletedResult,
+          onConflict = conflict => Conflict(views.html.posts.index(state.posts.mostRecent(20), conflict.events)))
+      else
+        abort(notFound)
     } getOrElse {
       abort(deletedResult)
     }
