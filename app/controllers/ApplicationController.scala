@@ -13,9 +13,18 @@ case class ApplicationRequest[A](currentUser: Option[User], request: Request[A])
 trait ApplicationController[Event] extends Controller {
   def memoryImage: MemoryImage[State, Event]
 
-  def ApplicationAction(f: ApplicationRequest[AnyContent] => Result) = Action { request =>
-    f(buildApplicationRequest(request, memoryImage.get))
+  def QueryAction(f: State => ApplicationRequest[AnyContent] => Result) = Action { request =>
+    val state = memoryImage.get
+    f(state)(buildApplicationRequest(request, state))
   }
+
+  def CommandAction(f: State => ApplicationRequest[AnyContent] => Transaction[Event, Result]) = Action { request =>
+    memoryImage.modify { state =>
+      f(state)(buildApplicationRequest(request, state))
+    }
+  }
+
+  def ApplicationAction(f: ApplicationRequest[AnyContent] => Result) = QueryAction { _ => request => f(request) }
 
   private def buildApplicationRequest[A](request: Request[A], state: models.State): ApplicationRequest[A] = {
     val authenticationToken = request.session.get("authenticationToken").flatMap(AuthenticationToken.fromString)

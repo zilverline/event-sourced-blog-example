@@ -26,34 +26,31 @@ class UsersController(override val memoryImage: MemoryImage[State, UserEvent], r
 
     def show = ApplicationAction { implicit request => Ok(views.html.users.log_in(loginForm)) }
 
-    def submit = ApplicationAction { implicit request =>
+    def submit = CommandAction { state => implicit request =>
       val form = loginForm.bindFromRequest
       form.fold(
         formWithErrors =>
-          BadRequest(views.html.users.log_in(formWithErrors)),
-        credentials =>
-          memoryImage.modify { state =>
-            val (email, password) = credentials
-            authenticate(state.users)(email, password) map {
-              case (user, token) =>
-                Changes(user.revision, UserLoggedIn(user.userId, token): UserEvent).commit(
-                  onCommit = Redirect(routes.UsersController.authentication.loggedIn).withSession("authenticationToken" -> token.toString),
-                  onConflict = conflict => sys.error("impossible conflict: " + conflict))
-            } getOrElse {
-              abort(BadRequest(views.html.users.log_in(form.addError(FormError("", "bad.credentials")))))
-            }
-          })
+          abort(BadRequest(views.html.users.log_in(formWithErrors))),
+        credentials => {
+          val (email, password) = credentials
+          authenticate(state.users)(email, password) map {
+            case (user, token) =>
+              Changes(user.revision, UserLoggedIn(user.userId, token): UserEvent).commit(
+                onCommit = Redirect(routes.UsersController.authentication.loggedIn).withSession("authenticationToken" -> token.toString),
+                onConflict = conflict => sys.error("impossible conflict: " + conflict))
+          } getOrElse {
+            abort(BadRequest(views.html.users.log_in(form.addError(FormError("", "bad.credentials")))))
+          }
+        })
     }
 
-    def logOut = ApplicationAction { implicit request =>
+    def logOut = CommandAction { state => implicit request =>
       request.currentUser.map { user =>
-        memoryImage.modify { state =>
-          Changes(user.revision, UserLoggedOut(user.userId): UserEvent).commit(
-            onCommit = Redirect(routes.UsersController.authentication.loggedOut).withNewSession,
-            onConflict = conflict => sys.error("impossible conflict: " + conflict))
-        }
+        Changes(user.revision, UserLoggedOut(user.userId): UserEvent).commit(
+          onCommit = Redirect(routes.UsersController.authentication.loggedOut).withNewSession,
+          onConflict = conflict => sys.error("impossible conflict: " + conflict))
       } getOrElse {
-        Redirect(routes.UsersController.authentication.loggedOut).withNewSession
+        abort(Redirect(routes.UsersController.authentication.loggedOut).withNewSession)
       }
     }
 
@@ -79,28 +76,21 @@ class UsersController(override val memoryImage: MemoryImage[State, UserEvent], r
     def show = ApplicationAction { implicit request =>
       Ok(views.html.users.register(registrationForm))
     }
-    def submit = ApplicationAction { implicit request =>
+    def submit = CommandAction { state => implicit request =>
       val form = registrationForm.bindFromRequest
       form.fold(
         formWithErrors =>
-          BadRequest(views.html.users.register(formWithErrors)),
+          abort(BadRequest(views.html.users.register(formWithErrors))),
         registration => {
           val (email, displayName, password) = registration
           val userId = registerEmailAddress(email)
-          memoryImage.modify { _ =>
-            Changes(StreamRevision.Initial, UserRegistered(userId, email, displayName, password): UserEvent).commit(
-              onCommit = Redirect(routes.UsersController.register.registered),
-              onConflict = _ => BadRequest(views.html.users.register(form.addError(FormError("", "duplicate.account")))))
-          }
+          Changes(StreamRevision.Initial, UserRegistered(userId, email, displayName, password): UserEvent).commit(
+            onCommit = Redirect(routes.UsersController.register.registered),
+            onConflict = _ => BadRequest(views.html.users.register(form.addError(FormError("", "duplicate.account")))))
         })
     }
     def registered = ApplicationAction { implicit request =>
       Ok(views.html.users.registered())
     }
   }
-
-  /**
-   * 404 Not Found response.
-   */
-  private[this] def notFound(implicit request: Request[_]): Result = NotFound(views.html.defaultpages.notFound(request, None))
 }
