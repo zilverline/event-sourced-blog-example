@@ -7,6 +7,8 @@ import scala.annotation.tailrec
  * The transaction to commit to the event when modifying the memory image.
  */
 sealed trait Transaction[+Event, +A] {
+  def events: Seq[Event]
+
   /**
    * Maps the result of this transaction from `A` to `B` using `f`.
    */
@@ -40,9 +42,11 @@ object Transaction {
   }
 }
 private case class TransactionAbort[A](onAbort: () => A) extends Transaction[Nothing, A] {
+  override def events = Seq.empty
   override def map[B](f: A => B): Transaction[Nothing, B] = TransactionAbort(() => f(onAbort()))
 }
 private case class TransactionCommit[Event, A](changes: Changes[Event], onCommit: () => A, onConflict: Conflict[Event] => A, conflictsWith: ConflictsWith[Event]) extends Transaction[Event, A] {
+  override def events = changes.events
   override def map[B](f: A => B): Transaction[Event, B] =
     TransactionCommit[Event, B](changes, () => f(onCommit()), conflict => f(onConflict(conflict)), conflictsWith)
 }

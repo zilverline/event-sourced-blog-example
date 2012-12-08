@@ -3,7 +3,6 @@ package models
 import events._
 import eventstore.StreamRevision
 import scala.collection.immutable.SortedMap
-import controllers.ApplicationRequestHeader
 
 /**
  * A specific blog post with its current revision and content.

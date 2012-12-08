@@ -90,12 +90,9 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
   def delete(id: PostId, expected: StreamRevision) = AuthenticatedCommandAction { user => state => implicit request =>
     def deletedResult = Redirect(routes.PostsController.index).flashing("info" -> "Post deleted.")
     state.posts.get(id) map { post =>
-      if (post isAuthoredBy user)
-        Changes(expected, PostDeleted(id): PostEvent).commit(
-          onCommit = deletedResult,
-          onConflict = conflict => Conflict(views.html.posts.index(state.posts.mostRecent(20), conflict.events)))
-      else
-        abort(notFound)
+      Changes(expected, PostDeleted(id): PostEvent).commit(
+        onCommit = deletedResult,
+        onConflict = conflict => Conflict(views.html.posts.index(state.posts.mostRecent(20), conflict.events)))
     } getOrElse {
       abort(deletedResult)
     }
@@ -131,18 +128,16 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
     }
 
     def delete(postId: PostId, expected: StreamRevision, commentId: CommentId) = AuthenticatedCommandAction { user => state => implicit request =>
-      def deletedResult = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment deleted.")
-        (for {
-          post <- state.posts.get(postId)
-          comment <- post.comments.get(commentId)
-          if post.isAuthoredBy(user) || comment.isAuthoredBy(user)
-        } yield {
-          Changes(expected, CommentDeleted(postId, commentId): PostEvent).commit(
-            onCommit = deletedResult,
-            onConflict = conflict => Conflict(views.html.posts.show(post, commentContentForm, conflict.events)))
-        }).getOrElse {
-            abort(notFound)
-        }
+      (for {
+        post <- state.posts.get(postId)
+        comment <- post.comments.get(commentId)
+      } yield {
+        Changes(expected, CommentDeleted(postId, commentId): PostEvent).commit(
+          onCommit = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment deleted."),
+          onConflict = conflict => Conflict(views.html.posts.show(post, commentContentForm, conflict.events)))
+      }).getOrElse {
+          abort(notFound)
+      }
     }
   }
 }

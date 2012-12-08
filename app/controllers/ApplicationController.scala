@@ -1,6 +1,6 @@
 package controllers
 
-import events.AuthenticationToken
+import events._
 import eventstore._
 import models._
 import play.api.mvc._
@@ -10,7 +10,7 @@ trait ApplicationRequestHeader extends RequestHeader {
 }
 case class ApplicationRequest[A](currentUser: Option[User], request: Request[A]) extends WrappedRequest(request) with ApplicationRequestHeader
 
-trait ApplicationController[Event] extends Controller {
+trait ApplicationController[Event <: DomainEvent] extends Controller {
   def memoryImage: MemoryImage[State, Event]
 
   /**
@@ -21,9 +21,9 @@ trait ApplicationController[Event] extends Controller {
   type QueryAction[A] = State => ApplicationRequest[A] => Result
   type CommandAction[A] = State => ApplicationRequest[AnyContent] => Transaction[Event, Result]
 
-  def QueryAction(block: QueryAction[AnyContent]) = Action { request =>
+  def QueryAction(block: QueryAction[AnyContent]) = Action { implicit request =>
     val state = memoryImage.get
-    block(state)(buildApplicationRequest(request, state))
+    block(state)(buildApplicationRequest(state))
   }
 
   def AuthenticatedQueryAction(block: User => QueryAction[AnyContent]) = QueryAction {
@@ -35,9 +35,14 @@ trait ApplicationController[Event] extends Controller {
       }
   }
 
-  def CommandAction(block: CommandAction[AnyContent]) = Action { request =>
+  def CommandAction(block: CommandAction[AnyContent]) = Action { implicit request =>
     memoryImage.modify { state =>
-      block(state)(buildApplicationRequest(request, state))
+      val applicationRequest = buildApplicationRequest(state)
+      val transaction = block(state)(applicationRequest)
+      if (Authorization.authorizeChanges(applicationRequest.currentUser, state, transaction.events))
+        transaction
+      else
+        Transaction.abort(notFound)
     }
   }
 
@@ -52,7 +57,7 @@ trait ApplicationController[Event] extends Controller {
 
   def ApplicationAction(block: ApplicationRequest[AnyContent] => Result) = QueryAction { _ => request => block(request) }
 
-  private def buildApplicationRequest[A](request: Request[A], state: models.State): ApplicationRequest[A] = {
+  private def buildApplicationRequest[A](state: models.State)(implicit request: Request[A]): ApplicationRequest[A] = {
     val authenticationToken = request.session.get("authenticationToken").flatMap(AuthenticationToken.fromString)
     val user = authenticationToken.flatMap(state.users.authenticated)
     ApplicationRequest(user, request)
