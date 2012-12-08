@@ -93,18 +93,41 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
       changes must_== Seq(CommentAdded(postId, CommentId(1), CommentContent(Right("Commenter"), "Body")))
     }
 
-    "delete comment from post" in new fixture {
+    "delete comment by the post author" in new fixture {
       given(
         PostAdded(postId, currentUserId, postContent): PostEvent,
-        CommentAdded(postId, CommentId(1), CommentContent(Left(currentUserId), "Body")): PostEvent)
+        CommentAdded(postId, CommentId(1), CommentContent(Right("Commenter"), "Body")): PostEvent)
 
-      val result = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(unauthenticatedRequest)
+      val result = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(authenticatedRequest)
 
       status(result) must_== 303
       changes must_== Seq(CommentDeleted(postId, CommentId(1)))
     }
+
+    "delete comments by the comment author" in new fixture {
+      given(
+        PostAdded(postId, UserId.generate(), postContent): PostEvent,
+        CommentAdded(postId, CommentId(1), CommentContent(Left(currentUserId), "Body")): PostEvent)
+
+      val result = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(authenticatedRequest)
+
+      status(result) must_== 303
+      changes must_== Seq(CommentDeleted(postId, CommentId(1)))
+    }
+
+    "not allow deleting comments when not the post author or the comment author" in new fixture {
+      given(
+        PostAdded(postId, UserId.generate(), postContent): PostEvent,
+        CommentAdded(postId, CommentId(1), CommentContent(Left(UserId.generate()), "Body")): PostEvent)
+
+      val result = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(authenticatedRequest)
+
+      status(result) must_== 404
+      changes must beEmpty
+    }
   }
 
+  val password = Password.fromPlainText("password")
   trait fixture extends After { self =>
     Play.start(FakeApplication())
 
@@ -131,7 +154,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     def changes = eventStore.reader.readCommits(initialStoreRevision, StoreRevision.Maximum).flatMap(_.events).toSeq
 
     given(
-      UserRegistered(currentUserId, EmailAddress("joe@example.com"), "Joe", Password.fromPlainText("password")): UserEvent,
+      UserRegistered(currentUserId, EmailAddress("joe@example.com"), "Joe", password): UserEvent,
       UserLoggedIn(currentUserId, authenticationToken): UserEvent)
 
     val subject = new PostsController(memoryImage)

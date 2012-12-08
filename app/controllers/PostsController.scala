@@ -135,17 +135,21 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
     }
 
     def delete(postId: PostId, expected: StreamRevision, commentId: CommentId) = CommandAction { state => implicit request =>
-      state.posts.get(postId) map { post =>
-        def deletedResult = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment deleted.")
-        post.comments.get(commentId) map { comment =>
+      def deletedResult = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment deleted.")
+      request.currentUser.map { user =>
+        (for {
+          post <- state.posts.get(postId)
+          comment <- post.comments.get(commentId)
+          if post.isAuthoredByCurrentUser || comment.isAuthoredByCurrentUser
+        } yield {
           Changes(expected, CommentDeleted(postId, commentId): PostEvent).commit(
             onCommit = deletedResult,
             onConflict = conflict => Conflict(views.html.posts.show(post, commentContentForm, conflict.events)))
-        } getOrElse {
-          abort(deletedResult)
+        }).getOrElse {
+            abort(notFound)
         }
       } getOrElse {
-        abort(notFound)
+        abort(Unauthorized)
       }
     }
   }

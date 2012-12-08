@@ -49,7 +49,7 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
 
     val CommentContent_1 = CommentContent(Right("Commenter"), "Body 1")
     "track comments and the next comment id" in {
-      given events (PostAdded(A, Author, Content), CommentAdded(A, CommentId(1), CommentContent_1)) thenPostWithId A must beSome(Post(A, StreamRevision(2), Author, AuthorDisplayName, Content, CommentId(2), SortedMap(CommentId(1) -> CommentContent_1)))
+      given events (PostAdded(A, Author, Content), CommentAdded(A, CommentId(1), CommentContent_1)) thenPostWithId A must beSome(Post(A, StreamRevision(2), Author, AuthorDisplayName, Content, CommentId(2), SortedMap(CommentId(1) -> Comment(CommentId(1), "Commenter", CommentContent_1))))
       given events (PostAdded(A, Author, Content), CommentAdded(A, CommentId(1), CommentContent_1), CommentDeleted(A, CommentId(1))) thenPostWithId A must beSome(Post(A, StreamRevision(3), Author, AuthorDisplayName, Content, CommentId(2), SortedMap.empty))
 
       forAllNoShrink(arbitrary(eventsForSinglePost(A))) { events =>
@@ -57,7 +57,7 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
           val post = given.events(events: _*).posts.get(A).getOrElse(failure("post not found"))
           val commentsAdded = events.collect { case e: CommentAdded => e }
           val commentsDeleted = events.collect { case e: CommentDeleted => e }.map(_.commentId).toSet
-          val remaining = commentsAdded.filterNot(e => commentsDeleted.contains(e.commentId)).map(e => (e.commentId, e.content)).toMap
+          val remaining = commentsAdded.filterNot(e => commentsDeleted.contains(e.commentId)).map(e => (e.commentId, Comment(e.commentId, e.content.commenter.fold(_ => "Joe", identity), e.content))).toMap
 
           post.nextCommentId must_== CommentId(commentsAdded.size + 1)
           remaining must_== post.comments
@@ -67,13 +67,15 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
   }
 
   object given {
+    val password = Password.fromPlainText("password")
+
     def event(event: PostEvent) = events(event)
     def events(events: PostEvent*) = new {
       val posts = {
         val eventStore = FakeEventStore.fromHistory(events)
         try {
           val commits = eventStore.reader.readCommits(StoreRevision.Initial, StoreRevision.Maximum)
-          commits.flatMap(_.eventsWithRevision).foldLeft(Posts())((posts, event) => posts.update(event._1, event._2, userId => Some(User(userId, StreamRevision(1), EmailAddress("joe@example.com"), "Joe", null))))
+          commits.flatMap(_.eventsWithRevision).foldLeft(Posts())((posts, event) => posts.update(event._1, event._2, userId => Some(User(userId, StreamRevision(1), EmailAddress("joe@example.com"), "Joe", password))))
         } finally {
           eventStore.close
         }

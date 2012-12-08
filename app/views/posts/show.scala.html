@@ -14,13 +14,13 @@
 
   @if(post.comments.nonEmpty) {
     <h2>Comments</h2>
-    @for((commentId, commentContent) <- post.comments) {
+    @for((commentId, comment) <- post.comments) {
       <br/>
       <div style="display: inline-block;">
         <form class="form-inline" style="display: inline-block;" action="@routes.PostsController.comments.delete(post.id, post.revision, commentId)" method="POST">
           <fieldset><button>&times;</button></fieldset>
         </form>
-        &nbsp; @commentContent.body -- <em>by @commentContent.commenter</em>
+        &nbsp; @comment.content.body -- <em>by @comment.content.commenter</em>
       </div>
     }
   }
