@@ -51,7 +51,7 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
         formWithErrors =>
           abort(BadRequest(views.html.posts.add(id, formWithErrors))),
         postContent =>
-          Changes(StreamRevision.Initial, PostAdded(id, user.userId, postContent): PostEvent).commit(
+          Changes(StreamRevision.Initial, PostAdded(id, user.id, postContent): PostEvent).commit(
             onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post added."),
             onConflict = conflict => Conflict(views.html.posts.edit(id, conflict.actual, postContentForm.fill(postContent), conflict.events))))
     }
@@ -105,7 +105,7 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
     def commentContentForm(implicit request: ApplicationRequestHeader): Form[CommentContent] = Form(
       request.currentUser.map { user =>
         single("body" -> trimmedText.verifying(minLength(3))).transform[CommentContent](
-          body => CommentContent(Left(user.userId), body),
+          body => CommentContent(Left(user.id), body),
           commentContent => commentContent.body)
       }.getOrElse {
         mapping(

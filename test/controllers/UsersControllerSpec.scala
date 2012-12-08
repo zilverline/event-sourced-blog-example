@@ -29,7 +29,7 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
       val user = users.get(EmailAddress("john@example.com")) getOrElse { failure("user not registered") }
       user.emailAddress must_== EmailAddress("john@example.com")
       user.password.verify("password") aka "password verified" must beTrue
-      user.userId aka "claimed user id" must_== userId
+      user.id aka "claimed user id" must_== userId
     }
 
     "allow registered user to log in" in new fixture {

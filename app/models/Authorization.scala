@@ -8,10 +8,10 @@ object Authorization {
 
   def authorizeAuthenticated(user: User)(state: State): DomainEvent => Boolean = {
     case event: UserRegistered      => false
-    case event: UserPasswordChanged => event.userId == user.userId
+    case event: UserPasswordChanged => event.userId == user.id
     case event: UserLoggedIn        => true
-    case event: UserLoggedOut       => event.userId == user.userId
-    case event: PostAdded           => event.authorId == user.userId
+    case event: UserLoggedOut       => event.userId == user.id
+    case event: PostAdded           => event.authorId == user.id
     case event: PostEdited          => state.posts.get(event.postId).exists(_ isAuthoredBy user)
     case event: PostDeleted         => state.posts.get(event.postId).exists(_ isAuthoredBy user)
     case event: CommentAdded        => true

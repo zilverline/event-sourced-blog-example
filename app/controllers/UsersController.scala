@@ -35,7 +35,7 @@ class UsersController(override val memoryImage: MemoryImage[State, UserEvent], r
           val (email, password) = credentials
           authenticate(state.users)(email, password) map {
             case (user, token) =>
-              Changes(user.revision, UserLoggedIn(user.userId, token): UserEvent).commit(
+              Changes(user.revision, UserLoggedIn(user.id, token): UserEvent).commit(
                 onCommit = Redirect(routes.UsersController.authentication.loggedIn).withSession("authenticationToken" -> token.toString),
                 onConflict = conflict => sys.error("impossible conflict: " + conflict))
           } getOrElse {
@@ -46,7 +46,7 @@ class UsersController(override val memoryImage: MemoryImage[State, UserEvent], r
 
     def logOut = CommandAction { state => implicit request =>
       request.currentUser.map { user =>
-        Changes(user.revision, UserLoggedOut(user.userId): UserEvent).commit(
+        Changes(user.revision, UserLoggedOut(user.id): UserEvent).commit(
           onCommit = Redirect(routes.UsersController.authentication.loggedOut).withNewSession,
           onConflict = conflict => sys.error("impossible conflict: " + conflict))
       } getOrElse {
