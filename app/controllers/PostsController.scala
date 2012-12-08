@@ -42,22 +42,18 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
    * Show and submit actions for adding a new blog post.
    */
   object add {
-    def show = ApplicationAction { implicit request =>
+    def show = AuthenticatedQueryAction { _ => _ => implicit request =>
       Ok(views.html.posts.add(PostId.generate(), postContentForm))
     }
 
-    def submit(id: PostId) = CommandAction { state => implicit request =>
-      request.currentUser map { user =>
-          postContentForm.bindFromRequest.fold(
-            formWithErrors =>
-              abort(BadRequest(views.html.posts.add(id, formWithErrors))),
-            postContent =>
-              Changes(StreamRevision.Initial, PostAdded(id, user.userId, postContent): PostEvent).commit(
-                onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post added."),
-                onConflict = conflict => Conflict(views.html.posts.edit(id, conflict.actual, postContentForm.fill(postContent), conflict.events))))
-      } getOrElse {
-        abort(Unauthorized)
-      }
+    def submit(id: PostId) = AuthenticatedCommandAction { user => state => implicit request =>
+      postContentForm.bindFromRequest.fold(
+        formWithErrors =>
+          abort(BadRequest(views.html.posts.add(id, formWithErrors))),
+        postContent =>
+          Changes(StreamRevision.Initial, PostAdded(id, user.userId, postContent): PostEvent).commit(
+            onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post added."),
+            onConflict = conflict => Conflict(views.html.posts.edit(id, conflict.actual, postContentForm.fill(postContent), conflict.events))))
     }
   }
 
@@ -65,16 +61,16 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
    * Show and submit actions for editing an existing blog post.
    */
   object edit {
-    def show(id: PostId) = QueryAction { state => implicit request =>
-      state.posts.get(id).filter(_.isAuthoredByCurrentUser) map { post =>
+    def show(id: PostId) = AuthenticatedQueryAction { user => state => implicit request =>
+      state.posts.get(id).filter(_ isAuthoredBy user) map { post =>
         Ok(views.html.posts.edit(post.id, post.revision, postContentForm.fill(post.content)))
       } getOrElse {
         notFound
       }
     }
 
-    def submit(id: PostId, expected: StreamRevision) = CommandAction { state => implicit request =>
-      state.posts.get(id).filter(_.isAuthoredByCurrentUser) map { post =>
+    def submit(id: PostId, expected: StreamRevision) = AuthenticatedCommandAction { user => state => implicit request =>
+      state.posts.get(id).filter(_ isAuthoredBy user) map { post =>
         postContentForm.bindFromRequest.fold(
           formWithErrors =>
             abort(BadRequest(views.html.posts.edit(id, expected, formWithErrors))),
@@ -91,10 +87,10 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
   /**
    * Delete a blog post.
    */
-  def delete(id: PostId, expected: StreamRevision) = CommandAction { state => implicit request =>
+  def delete(id: PostId, expected: StreamRevision) = AuthenticatedCommandAction { user => state => implicit request =>
     def deletedResult = Redirect(routes.PostsController.index).flashing("info" -> "Post deleted.")
     state.posts.get(id) map { post =>
-      if (post.isAuthoredByCurrentUser)
+      if (post isAuthoredBy user)
         Changes(expected, PostDeleted(id): PostEvent).commit(
           onCommit = deletedResult,
           onConflict = conflict => Conflict(views.html.posts.index(state.posts.mostRecent(20), conflict.events)))
@@ -134,13 +130,12 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
       }
     }
 
-    def delete(postId: PostId, expected: StreamRevision, commentId: CommentId) = CommandAction { state => implicit request =>
+    def delete(postId: PostId, expected: StreamRevision, commentId: CommentId) = AuthenticatedCommandAction { user => state => implicit request =>
       def deletedResult = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment deleted.")
-      request.currentUser.map { user =>
         (for {
           post <- state.posts.get(postId)
           comment <- post.comments.get(commentId)
-          if post.isAuthoredByCurrentUser || comment.isAuthoredByCurrentUser
+          if post.isAuthoredBy(user) || comment.isAuthoredBy(user)
         } yield {
           Changes(expected, CommentDeleted(postId, commentId): PostEvent).commit(
             onCommit = deletedResult,
@@ -148,14 +143,6 @@ class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) e
         }).getOrElse {
             abort(notFound)
         }
-      } getOrElse {
-        abort(Unauthorized)
-      }
     }
   }
-
-  /**
-   * 404 Not Found response.
-   */
-  private[this] def notFound(implicit request: Request[_]): Result = NotFound(views.html.defaultpages.notFound(request, None))
 }

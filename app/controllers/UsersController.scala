@@ -54,7 +54,7 @@ class UsersController(override val memoryImage: MemoryImage[State, UserEvent], r
       }
     }
 
-    def loggedIn = ApplicationAction { implicit request => Ok(views.html.users.logged_in()) }
+    def loggedIn = AuthenticatedQueryAction { _ => _ => implicit request => Ok(views.html.users.logged_in()) }
     def loggedOut = ApplicationAction { implicit request => Ok(views.html.users.logged_out()) }
   }
 

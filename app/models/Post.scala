@@ -17,11 +17,10 @@ case class Post(
     nextCommentId: CommentId = CommentId(1),
     comments: SortedMap[CommentId, Comment] = SortedMap.empty) {
 
-  def isAuthoredByCurrentUser(implicit request: ApplicationRequestHeader) = request.currentUser.exists(_.isAuthorOf(this))
+  def isAuthoredBy(user: User) = authorId == user.userId
 }
 case class Comment(id: CommentId, commenterDisplayName: String, content: CommentContent) {
-  def isAuthoredByCurrentUser(implicit request: ApplicationRequestHeader) =
-    request.currentUser.map { user => content.commenter.left.exists(_ == user.userId) }.getOrElse(false)
+  def isAuthoredBy(user: User) = content.commenter.left.exists(_ == user.userId)
 }
 
 /**

@@ -34,7 +34,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     "not allow adding post when not logged in" in new fixture {
       val result = subject.add.submit(postId)(unauthenticatedRequest.withFormUrlEncodedBody("title" -> "title", "body" -> "body"))
 
-      status(result) must_== 401
+      status(result) must_== 404
       changes must beEmpty
     }
 

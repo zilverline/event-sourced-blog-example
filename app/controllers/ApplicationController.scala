@@ -13,18 +13,44 @@ case class ApplicationRequest[A](currentUser: Option[User], request: Request[A])
 trait ApplicationController[Event] extends Controller {
   def memoryImage: MemoryImage[State, Event]
 
-  def QueryAction(f: State => ApplicationRequest[AnyContent] => Result) = Action { request =>
+  /**
+   * 404 Not Found response.
+   */
+  protected[this] def notFound(implicit request: Request[_]): Result = NotFound(views.html.defaultpages.notFound(request, None))
+
+  type QueryAction[A] = State => ApplicationRequest[A] => Result
+  type CommandAction[A] = State => ApplicationRequest[AnyContent] => Transaction[Event, Result]
+
+  def QueryAction(block: QueryAction[AnyContent]) = Action { request =>
     val state = memoryImage.get
-    f(state)(buildApplicationRequest(request, state))
+    block(state)(buildApplicationRequest(request, state))
   }
 
-  def CommandAction(f: State => ApplicationRequest[AnyContent] => Transaction[Event, Result]) = Action { request =>
+  def AuthenticatedQueryAction(block: User => QueryAction[AnyContent]) = QueryAction {
+    state => implicit request =>
+      request.currentUser map { user =>
+        block(user)(state)(request)
+      } getOrElse {
+        notFound
+      }
+  }
+
+  def CommandAction(block: CommandAction[AnyContent]) = Action { request =>
     memoryImage.modify { state =>
-      f(state)(buildApplicationRequest(request, state))
+      block(state)(buildApplicationRequest(request, state))
     }
   }
 
-  def ApplicationAction(f: ApplicationRequest[AnyContent] => Result) = QueryAction { _ => request => f(request) }
+  def AuthenticatedCommandAction(block: User => CommandAction[AnyContent]) = CommandAction {
+    state => implicit request =>
+      request.currentUser map { user =>
+        block(user)(state)(request)
+      } getOrElse {
+        Transaction.abort(notFound)
+      }
+  }
+
+  def ApplicationAction(block: ApplicationRequest[AnyContent] => Result) = QueryAction { _ => request => block(request) }
 
   private def buildApplicationRequest[A](request: Request[A], state: models.State): ApplicationRequest[A] = {
     val authenticationToken = request.session.get("authenticationToken").flatMap(AuthenticationToken.fromString)

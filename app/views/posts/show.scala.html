@@ -5,7 +5,7 @@
   <div class="well">
     <p>@post.content.body -- <em>by @post.authorDisplayName</em></p>
     <div class="btn-group">
-      @if(post.isAuthoredByCurrentUser) {
+      @if(request.currentUser.exists(post isAuthoredBy _)) {
         <a class="btn" href="@routes.PostsController.edit.show(post.id)">Edit</a>
       }
       <a class="btn" href="@routes.PostsController.index()">Back</a>
