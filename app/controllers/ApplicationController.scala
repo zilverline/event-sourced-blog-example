@@ -11,15 +11,15 @@ trait ApplicationRequestHeader extends RequestHeader {
 case class ApplicationRequest[A](currentUser: Option[User], request: Request[A]) extends WrappedRequest(request) with ApplicationRequestHeader
 
 trait ApplicationController[Event <: DomainEvent] extends Controller {
-  def memoryImage: MemoryImage[State, Event]
+  def memoryImage: MemoryImage[ApplicationState, Event]
 
   /**
    * 404 Not Found response.
    */
   protected[this] def notFound(implicit request: Request[_]): Result = NotFound(views.html.defaultpages.notFound(request, None))
 
-  type QueryAction[A] = State => ApplicationRequest[A] => Result
-  type CommandAction[A] = State => ApplicationRequest[AnyContent] => Transaction[Event, Result]
+  type QueryAction[A] = ApplicationState => ApplicationRequest[A] => Result
+  type CommandAction[A] = ApplicationState => ApplicationRequest[AnyContent] => Transaction[Event, Result]
 
   def QueryAction(block: QueryAction[AnyContent]) = Action { implicit request =>
     val state = memoryImage.get
@@ -57,7 +57,7 @@ trait ApplicationController[Event <: DomainEvent] extends Controller {
 
   def ApplicationAction(block: ApplicationRequest[AnyContent] => Result) = QueryAction { _ => request => block(request) }
 
-  private def buildApplicationRequest[A](state: models.State)(implicit request: Request[A]): ApplicationRequest[A] = {
+  private def buildApplicationRequest[A](state: models.ApplicationState)(implicit request: Request[A]): ApplicationRequest[A] = {
     val authenticationToken = request.session.get("authenticationToken").flatMap(AuthenticationToken.fromString)
     val user = authenticationToken.flatMap(state.users.authenticated)
     ApplicationRequest(user, request)

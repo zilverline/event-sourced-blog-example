@@ -3,7 +3,7 @@ package controllers
 import play.api._
 import play.api.mvc._
 import eventstore.MemoryImage
-import models.State
+import models.ApplicationState
 
 object Application extends ApplicationController[Nothing] {
   override def memoryImage = Global.persistence.memoryImage

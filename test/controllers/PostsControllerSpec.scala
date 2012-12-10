@@ -147,7 +147,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
       initialStoreRevision = eventStore.reader.storeRevision
     }
 
-    val memoryImage = MemoryImage[State, DomainEvent](eventStore)(State()) {
+    val memoryImage = MemoryImage[ApplicationState, DomainEvent](eventStore)(ApplicationState()) {
       (state, commit) => state.updateMany(commit.eventsWithRevision)
     }
 

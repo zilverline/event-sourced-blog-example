@@ -33,7 +33,7 @@ object Global extends GlobalSettings {
           config = jedisConfig)
     }
 
-    val memoryImage = MemoryImage[State, DomainEvent](eventStore)(State()) {
+    val memoryImage = MemoryImage[ApplicationState, DomainEvent](eventStore)(ApplicationState()) {
       (state, commit) => state.updateMany(commit.eventsWithRevision)
     }
   }

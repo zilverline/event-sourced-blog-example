@@ -3,10 +3,12 @@ package models
 import events._
 
 object Authorization {
-  def authorizeChanges(currentUser: Option[User], state: State, events: Seq[DomainEvent]): Boolean =
-    events.forall(currentUser.map(authorizeAuthenticated).getOrElse(authorizeAnonymous(_))(state))
+  def authorizeChanges(currentUser: Option[User], state: ApplicationState, events: Seq[DomainEvent]): Boolean = {
+    val authorized = currentUser.map(authorizeUser _).getOrElse(authorizeGuest _)(state)
+    events.forall(authorized)
+  }
 
-  def authorizeAuthenticated(user: User)(state: State): DomainEvent => Boolean = {
+  private def authorizeUser(user: User)(state: ApplicationState): DomainEvent => Boolean = {
     case event: UserRegistered      => false
     case event: UserPasswordChanged => event.userId == user.id
     case event: UserLoggedIn        => true
@@ -19,12 +21,15 @@ object Authorization {
       (for {
         post <- state.posts.get(event.postId)
         comment <- post.comments.get(event.commentId)
-        if post.isAuthoredBy(user) || comment.isAuthoredBy(user)
-      } yield ()).isDefined
+      } yield {
+        user.canDeleteComment(post, comment)
+      }) getOrElse {
+        false
+      }
     case _ => false
   }
 
-  def authorizeAnonymous(state: State): DomainEvent => Boolean = {
+  private def authorizeGuest(state: ApplicationState): DomainEvent => Boolean = {
     case _: UserRegistered => true
     case _: UserLoggedIn   => true
     case _: CommentAdded   => true

@@ -60,7 +60,7 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
     val claimedUserIds = collection.mutable.Map.empty[EmailAddress, UserId]
     val eventStore: EventStore[UserEvent] = new fake.FakeEventStore
 
-    val memoryImage = MemoryImage[State, UserEvent](eventStore)(State()) {
+    val memoryImage = MemoryImage[ApplicationState, UserEvent](eventStore)(ApplicationState()) {
       (state, commit) => state.updateMany(commit.eventsWithRevision)
     }
 

@@ -15,7 +15,7 @@ import scala.annotation.tailrec
 import support.Forms._
 
 object UsersController extends UsersController(Global.persistence.memoryImage, Global.emailAddressRegistry)
-class UsersController(override val memoryImage: MemoryImage[State, UserEvent], registerEmailAddress: EmailAddress => UserId) extends ApplicationController[UserEvent] {
+class UsersController(override val memoryImage: MemoryImage[ApplicationState, UserEvent], registerEmailAddress: EmailAddress => UserId) extends ApplicationController[UserEvent] {
   object authentication {
     def authenticate(users: Users)(login: EmailAddress, password: String): Option[(User, AuthenticationToken)] =
       users.get(login).filter(_.password.verify(password)).map { user => (user, AuthenticationToken.generate) }

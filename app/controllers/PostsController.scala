@@ -12,7 +12,7 @@ import scala.annotation.tailrec
 import support.Forms._
 
 object PostsController extends PostsController(Global.persistence.memoryImage)
-class PostsController(override val memoryImage: MemoryImage[State, PostEvent]) extends ApplicationController[PostEvent] {
+class PostsController(override val memoryImage: MemoryImage[ApplicationState, PostEvent]) extends ApplicationController[PostEvent] {
   /**
    * Blog content form definition.
    */
