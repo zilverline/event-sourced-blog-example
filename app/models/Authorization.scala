@@ -14,8 +14,8 @@ object Authorization {
     case event: UserLoggedIn        => true
     case event: UserLoggedOut       => event.userId == user.id
     case event: PostAdded           => event.authorId == user.id
-    case event: PostEdited          => state.posts.get(event.postId).exists(_ isAuthoredBy user)
-    case event: PostDeleted         => state.posts.get(event.postId).exists(_ isAuthoredBy user)
+    case event: PostEdited          => state.posts.get(event.postId).exists(user canEditPost _)
+    case event: PostDeleted         => state.posts.get(event.postId).exists(user canDeletePost _)
     case event: CommentAdded        => true
     case event: CommentDeleted =>
       (for {

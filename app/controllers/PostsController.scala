@@ -62,7 +62,7 @@ class PostsController(override val memoryImage: MemoryImage[ApplicationState, Po
    */
   object edit {
     def show(id: PostId) = AuthenticatedQueryAction { user => state => implicit request =>
-      state.posts.get(id).filter(_ isAuthoredBy user) map { post =>
+      state.posts.get(id).filter(user canEditPost _) map { post =>
         Ok(views.html.posts.edit(post.id, post.revision, postContentForm.fill(post.content)))
       } getOrElse {
         notFound
@@ -70,7 +70,7 @@ class PostsController(override val memoryImage: MemoryImage[ApplicationState, Po
     }
 
     def submit(id: PostId, expected: StreamRevision) = AuthenticatedCommandAction { user => state => implicit request =>
-      state.posts.get(id).filter(_ isAuthoredBy user) map { post =>
+      state.posts.get(id).filter(user canEditPost _) map { post =>
         postContentForm.bindFromRequest.fold(
           formWithErrors =>
             abort(BadRequest(views.html.posts.edit(id, expected, formWithErrors))),
@@ -131,12 +131,13 @@ class PostsController(override val memoryImage: MemoryImage[ApplicationState, Po
       (for {
         post <- state.posts.get(postId)
         comment <- post.comments.get(commentId)
+        if user canDeleteComment (post, comment)
       } yield {
         Changes(expected, CommentDeleted(postId, commentId): PostEvent).commit(
           onCommit = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment deleted."),
           onConflict = conflict => Conflict(views.html.posts.show(post, commentContentForm, conflict.events)))
       }).getOrElse {
-          abort(notFound)
+        abort(notFound)
       }
     }
   }

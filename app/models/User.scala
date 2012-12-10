@@ -3,7 +3,11 @@ package models
 import events._
 import eventstore._
 
-case class User(id: UserId, revision: StreamRevision, emailAddress: EmailAddress, displayName: String, password: Password, authenticationToken: Option[AuthenticationToken] = None)
+case class User(id: UserId, revision: StreamRevision, emailAddress: EmailAddress, displayName: String, password: Password, authenticationToken: Option[AuthenticationToken] = None) {
+  def canEditPost(post: Post) = post.isAuthoredBy(this)
+  def canDeletePost(post: Post) = post.isAuthoredBy(this)
+  def canDeleteComment(post: Post, comment: Comment) = post.isAuthoredBy(this) || comment.isAuthoredBy(this)
+}
 
 case class Users(byId: Map[UserId, User] = Map.empty, byLogin: Map[EmailAddress, UserId] = Map.empty, byAuthenticationToken: Map[AuthenticationToken, UserId] = Map.empty) {
   def get(login: EmailAddress) = byLogin.get(login).map(byId)

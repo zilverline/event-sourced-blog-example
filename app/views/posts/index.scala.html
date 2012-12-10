@@ -18,8 +18,10 @@
             <form class="form-inline input-prepend" action="@routes.PostsController.delete(post.id, post.revision)" method="POST">
               <fieldset class="btn-group">
               <a class="btn" href="@routes.PostsController.show(post.id)">Show</a>
-              @if(request.currentUser.exists(post isAuthoredBy _)) {
+              @if(request.currentUser.exists(_ canEditPost post)) {
                 <a class="btn" href="@routes.PostsController.edit.show(post.id)">Edit</a>
+              }
+              @if(request.currentUser.exists(_ canDeletePost post)) {
                 <button class="btn">Delete</button>
               }
               </fieldset>
