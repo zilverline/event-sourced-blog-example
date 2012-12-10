@@ -12,9 +12,18 @@ trait User {
   def canEditPost(post: Post): Boolean = false
   def canDeletePost(post: Post): Boolean = false
   def canDeleteComment(post: Post, comment: Comment): Boolean = false
+
+  def authorizeEvent(state: ApplicationState): DomainEvent => Boolean
 }
 case object Guest extends User {
   def displayName = "Guest"
+
+  def authorizeEvent(state: ApplicationState): DomainEvent => Boolean = {
+    case _: UserRegistered => true
+    case _: UserLoggedIn   => true
+    case _: CommentAdded   => true
+    case _                 => false
+  }
 }
 case class RegisteredUser(id: UserId, revision: StreamRevision, emailAddress: EmailAddress, displayName: String, password: Password, authenticationToken: Option[AuthenticationToken] = None) extends User {
   override def registered = Some(this)
@@ -23,6 +32,27 @@ case class RegisteredUser(id: UserId, revision: StreamRevision, emailAddress: Em
   override def canEditPost(post: Post) = post.isAuthoredBy(this)
   override def canDeletePost(post: Post) = post.isAuthoredBy(this)
   override def canDeleteComment(post: Post, comment: Comment) = post.isAuthoredBy(this) || comment.isAuthoredBy(this)
+
+  def authorizeEvent(state: ApplicationState): DomainEvent => Boolean = {
+    case event: UserRegistered      => false
+    case event: UserPasswordChanged => id == event.userId
+    case event: UserLoggedIn        => true
+    case event: UserLoggedOut       => id == event.userId
+    case event: PostAdded           => id == event.authorId
+    case event: PostEdited          => state.posts.get(event.postId).exists(this canEditPost _)
+    case event: PostDeleted         => state.posts.get(event.postId).exists(this canDeletePost _)
+    case event: CommentAdded        => true
+    case event: CommentDeleted =>
+      (for {
+        post <- state.posts.get(event.postId)
+        comment <- post.comments.get(event.commentId)
+      } yield {
+        this.canDeleteComment(post, comment)
+      }) getOrElse {
+        false
+      }
+    case _ => false
+  }
 }
 
 case class Users(byId: Map[UserId, RegisteredUser] = Map.empty, byLogin: Map[EmailAddress, UserId] = Map.empty, byAuthenticationToken: Map[AuthenticationToken, UserId] = Map.empty) {

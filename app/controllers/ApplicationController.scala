@@ -39,7 +39,7 @@ trait ApplicationController[Event <: DomainEvent] extends Controller {
     memoryImage.modify { state =>
       val applicationRequest = buildApplicationRequest(state)
       val transaction = block(state)(applicationRequest)
-      if (Authorization.authorizeChanges(applicationRequest.currentUser, state, transaction.events))
+      if (transaction.events.forall(applicationRequest.currentUser.authorizeEvent(state)))
         transaction
       else
         Transaction.abort(notFound)
