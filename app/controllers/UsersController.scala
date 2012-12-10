@@ -17,7 +17,7 @@ import support.Forms._
 object UsersController extends UsersController(Global.persistence.memoryImage, Global.emailAddressRegistry)
 class UsersController(override val memoryImage: MemoryImage[ApplicationState, UserEvent], registerEmailAddress: EmailAddress => UserId) extends ApplicationController[UserEvent] {
   object authentication {
-    def authenticate(users: Users)(login: EmailAddress, password: String): Option[(User, AuthenticationToken)] =
+    def authenticate(users: Users)(login: EmailAddress, password: String): Option[(RegisteredUser, AuthenticationToken)] =
       users.get(login).filter(_.password.verify(password)).map { user => (user, AuthenticationToken.generate) }
 
     val loginForm: Form[(EmailAddress, String)] = Form(tuple(
@@ -45,7 +45,7 @@ class UsersController(override val memoryImage: MemoryImage[ApplicationState, Us
     }
 
     def logOut = CommandAction { state => implicit request =>
-      request.currentUser.map { user =>
+      request.currentUser.registered.map { user =>
         Changes(user.revision, UserLoggedOut(user.id): UserEvent).commit(
           onCommit = Redirect(routes.UsersController.authentication.loggedOut).withNewSession,
           onConflict = conflict => sys.error("impossible conflict: " + conflict))

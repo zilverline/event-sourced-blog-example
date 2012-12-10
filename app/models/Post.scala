@@ -16,10 +16,10 @@ case class Post(
     nextCommentId: CommentId = CommentId(1),
     comments: SortedMap[CommentId, Comment] = SortedMap.empty) {
 
-  def isAuthoredBy(user: User) = authorId == user.id
+  def isAuthoredBy(user: RegisteredUser) = authorId == user.id
 }
 case class Comment(id: CommentId, commenterDisplayName: String, content: CommentContent) {
-  def isAuthoredBy(user: User) = content.commenter.left.exists(_ == user.id)
+  def isAuthoredBy(user: RegisteredUser) = content.commenter.left.exists(_ == user.id)
 }
 
 /**

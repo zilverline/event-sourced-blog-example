@@ -103,7 +103,7 @@ class PostsController(override val memoryImage: MemoryImage[ApplicationState, Po
    */
   object comments {
     def commentContentForm(implicit request: ApplicationRequestHeader): Form[CommentContent] = Form(
-      request.currentUser.map { user =>
+      request.currentUser.registered.map { user =>
         single("body" -> trimmedText.verifying(minLength(3))).transform[CommentContent](
           body => CommentContent(Left(user.id), body),
           commentContent => commentContent.body)

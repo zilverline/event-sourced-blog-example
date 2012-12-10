@@ -6,9 +6,9 @@ import models._
 import play.api.mvc._
 
 trait ApplicationRequestHeader extends RequestHeader {
-  def currentUser: Option[User]
+  def currentUser: User
 }
-case class ApplicationRequest[A](currentUser: Option[User], request: Request[A]) extends WrappedRequest(request) with ApplicationRequestHeader
+case class ApplicationRequest[A](currentUser: User, request: Request[A]) extends WrappedRequest(request) with ApplicationRequestHeader
 
 trait ApplicationController[Event <: DomainEvent] extends Controller {
   def memoryImage: MemoryImage[ApplicationState, Event]
@@ -26,9 +26,9 @@ trait ApplicationController[Event <: DomainEvent] extends Controller {
     block(state)(buildApplicationRequest(state))
   }
 
-  def AuthenticatedQueryAction(block: User => QueryAction[AnyContent]) = QueryAction {
+  def AuthenticatedQueryAction(block: RegisteredUser => QueryAction[AnyContent]) = QueryAction {
     state => implicit request =>
-      request.currentUser map { user =>
+      request.currentUser.registered map { user =>
         block(user)(state)(request)
       } getOrElse {
         notFound
@@ -46,9 +46,9 @@ trait ApplicationController[Event <: DomainEvent] extends Controller {
     }
   }
 
-  def AuthenticatedCommandAction(block: User => CommandAction[AnyContent]) = CommandAction {
+  def AuthenticatedCommandAction(block: RegisteredUser => CommandAction[AnyContent]) = CommandAction {
     state => implicit request =>
-      request.currentUser map { user =>
+      request.currentUser.registered map { user =>
         block(user)(state)(request)
       } getOrElse {
         Transaction.abort(notFound)
@@ -59,7 +59,7 @@ trait ApplicationController[Event <: DomainEvent] extends Controller {
 
   private def buildApplicationRequest[A](state: models.ApplicationState)(implicit request: Request[A]): ApplicationRequest[A] = {
     val authenticationToken = request.session.get("authenticationToken").flatMap(AuthenticationToken.fromString)
-    val user = authenticationToken.flatMap(state.users.authenticated)
-    ApplicationRequest(user, request)
+    val authenticatedUser = authenticationToken.flatMap(state.users.authenticated)
+    ApplicationRequest(authenticatedUser getOrElse Guest, request)
   }
 }

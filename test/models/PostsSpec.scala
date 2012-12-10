@@ -75,7 +75,7 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
         val eventStore = FakeEventStore.fromHistory(events)
         try {
           val commits = eventStore.reader.readCommits(StoreRevision.Initial, StoreRevision.Maximum)
-          commits.flatMap(_.eventsWithRevision).foldLeft(Posts())((posts, event) => posts.update(event._1, event._2, userId => Some(User(userId, StreamRevision(1), EmailAddress("joe@example.com"), "Joe", password))))
+          commits.flatMap(_.eventsWithRevision).foldLeft(Posts())((posts, event) => posts.update(event._1, event._2, userId => Some(RegisteredUser(userId, StreamRevision(1), EmailAddress("joe@example.com"), "Joe", password))))
         } finally {
           eventStore.close
         }

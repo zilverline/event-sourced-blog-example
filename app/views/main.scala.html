@@ -18,7 +18,7 @@
                     <ul class="nav">
                         <li><a href="@routes.PostsController.index">Posts</a></li>
                     </ul>
-                    <ul class="nav pull-right">@request.currentUser.map { user =>
+                    <ul class="nav pull-right">@request.currentUser.registered.map { user =>
                         <li><a href="#">Welcome, @user.displayName</a></li>
                         <li><a href="@routes.UsersController.authentication.logOut">Log out</a></li>
                       }.getOrElse {
