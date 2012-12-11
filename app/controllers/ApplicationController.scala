@@ -18,15 +18,15 @@ trait ApplicationController[Event <: DomainEvent] extends Controller {
    */
   protected[this] def notFound(implicit request: Request[_]): Result = NotFound(views.html.defaultpages.notFound(request, None))
 
-  type QueryAction[A] = ApplicationState => ApplicationRequest[A] => Result
-  type CommandAction[A] = ApplicationState => ApplicationRequest[AnyContent] => Transaction[Event, Result]
+  type QueryBlock[A] = ApplicationState => ApplicationRequest[A] => Result
+  type CommandBlock[A] = ApplicationState => ApplicationRequest[A] => Transaction[Event, Result]
 
-  def QueryAction(block: QueryAction[AnyContent]) = Action { implicit request =>
+  def QueryAction(block: QueryBlock[AnyContent]) = Action { implicit request =>
     val state = memoryImage.get
     block(state)(buildApplicationRequest(state))
   }
 
-  def AuthenticatedQueryAction(block: RegisteredUser => QueryAction[AnyContent]) = QueryAction {
+  def AuthenticatedQueryAction(block: RegisteredUser => QueryBlock[AnyContent]) = QueryAction {
     state => implicit request =>
       request.currentUser.registered map { user =>
         block(user)(state)(request)
@@ -35,7 +35,7 @@ trait ApplicationController[Event <: DomainEvent] extends Controller {
       }
   }
 
-  def CommandAction(block: CommandAction[AnyContent]) = Action { implicit request =>
+  def CommandAction(block: CommandBlock[AnyContent]) = Action { implicit request =>
     memoryImage.modify { state =>
       val applicationRequest = buildApplicationRequest(state)
       val transaction = block(state)(applicationRequest)
@@ -46,7 +46,7 @@ trait ApplicationController[Event <: DomainEvent] extends Controller {
     }
   }
 
-  def AuthenticatedCommandAction(block: RegisteredUser => CommandAction[AnyContent]) = CommandAction {
+  def AuthenticatedCommandAction(block: RegisteredUser => CommandBlock[AnyContent]) = CommandAction {
     state => implicit request =>
       request.currentUser.registered map { user =>
         block(user)(state)(request)
