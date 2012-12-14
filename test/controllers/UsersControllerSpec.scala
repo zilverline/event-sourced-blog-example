@@ -26,58 +26,41 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
       val result = subject.register.submit(request)
 
       status(result) must_== 303
-      val user = users.get(EmailAddress("john@example.com")) getOrElse { failure("user not registered") }
-      user.emailAddress must_== EmailAddress("john@example.com")
-      user.password.verify("password") aka "password verified" must beTrue
-      user.id aka "claimed user id" must_== userId
+      changes must have size(1)
+      changes(0) must beAnInstanceOf[UserRegistered]
+
+      val event = changes(0).asInstanceOf[UserRegistered]
+      event.login must_== EmailAddress("john@example.com")
+      event.password.verify("password") aka "password verified" must beTrue
+      event.userId aka "claimed user id" must_== userId
     }
 
     "allow registered user to log in" in new fixture {
-      given(UserRegistered(userId, email, displayName, password))
+      given(UserRegistered(userId, email, displayName, password): UserEvent)
 
       val result = subject.authentication.submit(FakeRequest().withFormUrlEncodedBody("email" -> email.value, "password" -> "password"))
 
       status(result) must_== 303
       val token = session(result).get("authenticationToken").flatMap(AuthenticationToken.fromString) getOrElse { failure("authentication token not created") }
-      val user = users.authenticated(token) getOrElse { failure("token not mapped to user") }
-      user.emailAddress must_== email
+      changes must_== Seq(UserLoggedIn(userId, token))
     }
 
     "allow logged in users to log out" in new fixture {
-      given(UserRegistered(userId, email, displayName, password), UserLoggedIn(userId, authenticationToken))
+      given(
+          UserRegistered(userId, email, displayName, password): UserEvent,
+          UserLoggedIn(userId, authenticationToken): UserEvent)
 
       val result = subject.authentication.logOut(FakeRequest().withSession("authenticationToken" -> authenticationToken.toString))
 
       status(result) must_== 303
       session(result) must beEmpty
-      users.authenticated(authenticationToken) must beNone
+      changes must_== Seq(UserLoggedOut(userId))
     }
   }
 
-  trait fixture extends After { self =>
-    Play.start(FakeApplication())
-
+  trait fixture extends ControllerFixture {
     val claimedUserIds = collection.mutable.Map.empty[EmailAddress, UserId]
-    val eventStore: EventStore[UserEvent] = new fake.FakeEventStore
 
-    private val memoryImage = MemoryImage[Users, UserEvent](eventStore)(Users()) {
-      (state, commit) => state.updateMany(commit.eventsWithRevision)
-    }
-
-    val subject = new UsersController(new MemoryImageActions(memoryImage, (token, users) => users.authenticated(token), (user, state) => _ => true), email => claimedUserIds.getOrElseUpdate(email, UserId.generate()))
-
-    def given(events: UserEvent*)(implicit eventStreamType: EventStreamType[UserId, UserEvent]) {
-      for (event <- events) {
-        val revision = eventStore.reader.streamRevision(event.userId)
-        eventStore.committer.tryCommit(Changes(revision, event)) must beRight
-      }
-    }
-
-    def users = memoryImage.get
-
-    override def after {
-      Play.stop()
-      eventStore.close
-    }
+    val subject = new UsersController(new MemoryImageActions(memoryImage).view(_.users), email => claimedUserIds.getOrElseUpdate(email, UserId.generate()))
   }
 }

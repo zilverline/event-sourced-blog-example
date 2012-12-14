@@ -18,6 +18,8 @@ import org.apache.http.impl.client._
 import org.apache.http.message.BasicNameValuePair
 import org.apache.http.protocol.HttpContext
 import org.apache.http.util.EntityUtils
+import play.api.data._
+import play.api.data.Forms._
 import play.api.libs.json._
 import play.api.test._
 import play.api.test.Helpers._
@@ -35,7 +37,9 @@ import scala.util.Random
  * Make sure you start with a clean blog posts server before running!
  */
 object PerformanceTest extends App with Instrumented {
-  val postContentForm = new PostsController(null).postContentForm
+  val postContentForm = Form(mapping(
+    "title"  -> text,
+    "body"   -> text)(PostContent.apply)(PostContent.unapply))
 
   val connMgr = new ThreadSafeClientConnManager
   connMgr.setDefaultMaxPerRoute(100)
@@ -47,6 +51,7 @@ object PerformanceTest extends App with Instrumented {
     override def isRedirected(request: HttpRequest, response: HttpResponse, context: HttpContext) = false
   })
   implicit val http = httpWithRedirect
+  httpWithoutRedirect.setCookieStore(httpWithRedirect.getCookieStore())
 
   val (hosts, concurrency, iterations) = args match {
     case Array(hosts, concurrency, iterations) => (hosts.split(","), concurrency.toInt, iterations.toInt)
@@ -64,6 +69,17 @@ object PerformanceTest extends App with Instrumented {
     val title = randomAsciiString(10, 90)
     val content = randomAsciiString(250, 600)
     (id -> PostContent(title, content))
+  }
+
+  {
+    val register = new HttpPost(randomHost(random) + routes.UsersController.register.submit)
+    postParameters(register, Seq("displayName" -> "Name", "email" -> "email@example.com", "password.1" -> "password", "password.2" -> "password"))
+    println(register.getURI())
+    execute(register)
+
+    val login = new HttpPost(randomHost(random) + routes.UsersController.authentication.submit)
+    postParameters(login, Seq("email" -> "email@example.com", "password" -> "password"))
+    execute(login)(httpWithoutRedirect)
   }
 
   println("%-10s: %8s, %8s, %8s, %8s, %8s, %8s, %8s, %8s, %8s, %8s".
@@ -89,10 +105,14 @@ object PerformanceTest extends App with Instrumented {
     }
   }
 
-  def contentPostParameters(request: HttpPost, content: PostContent) {
-    val (fields, _) = postContentForm.mapping.unbind(content)
+  def postParameters(request: HttpPost, fields: Traversable[(String, String)]) {
     val parameters = fields.map { field => new BasicNameValuePair(field._1, field._2) }.toList.asJava
     request.setEntity(new UrlEncodedFormEntity(parameters))
+  }
+
+  def contentPostParameters(request: HttpPost, content: PostContent) {
+    val (fields, _) = postContentForm.mapping.unbind(content)
+    postParameters(request, fields)
   }
 
   def randomHost(implicit random: Random) = hosts(random.nextInt(hosts.length))

@@ -5,11 +5,8 @@ import eventstore._
 import models._
 import play.api.mvc._
 
-class MemoryImageActions[State, Event](
-  memoryImage: MemoryImage[State, Event],
-  findRegisteredUser: (AuthenticationToken, State) => Option[RegisteredUser],
-  authorizeChange: (User, State) => Event => Boolean)
-    extends ApplicationActions[State, Event] {
+class MemoryImageActions(memoryImage: MemoryImage[ApplicationState, DomainEvent])
+    extends ApplicationActions[ApplicationState, DomainEvent] {
 
   def QueryAction(block: QueryBlock[AnyContent]): Action[AnyContent] = Action { implicit request =>
     val state = memoryImage.get
@@ -20,16 +17,16 @@ class MemoryImageActions[State, Event](
     memoryImage.modify { state =>
       val applicationRequest = buildApplicationRequest(state)
       val transaction = block(state)(applicationRequest)
-      if (transaction.events.forall(authorizeChange(applicationRequest.currentUser, state)))
+      if (transaction.events.forall(applicationRequest.currentUser.authorizeEvent(state)))
         transaction
       else
         Transaction.abort(notFound)
     }
   }
 
-  private def buildApplicationRequest[A](state: State)(implicit request: Request[A]): ApplicationRequest[A] = {
+  private def buildApplicationRequest[A](state: ApplicationState)(implicit request: Request[A]): ApplicationRequest[A] = {
     val authenticationToken = request.session.get("authenticationToken").flatMap(AuthenticationToken.fromString)
-    val authenticatedUser = authenticationToken.flatMap(token => findRegisteredUser(token, state))
-    ApplicationRequest(authenticatedUser getOrElse Guest, request)
+    val authenticatedUser = authenticationToken.flatMap(token => state.users.authenticated(token))
+    new ApplicationRequest(authenticatedUser getOrElse Guest, state.users, request)
   }
 }

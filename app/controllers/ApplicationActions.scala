@@ -8,10 +8,14 @@ import play.api.mvc.Results._
 
 trait ApplicationRequestHeader extends RequestHeader {
   def currentUser: User
+  def findUser(id: UserId): Option[User]
 }
-case class ApplicationRequest[A](
-    currentUser: User,
-    request: Request[A]) extends WrappedRequest(request) with ApplicationRequestHeader
+class ApplicationRequest[A](
+    val currentUser: User,
+    users: Users,
+    request: Request[A]) extends WrappedRequest(request) with ApplicationRequestHeader {
+  def findUser(id: UserId) = users.byId.get(id)
+}
 
 /**
  * Actions available to a controller that makes use of a memory image.
@@ -71,6 +75,9 @@ trait ApplicationActions[State, -Event] extends Controller { outer =>
       }
     }
 
+  /**
+   * Only expose part of the state of the memory image using the provided function `f`.
+   */
   def view[S, E <: Event](f: State => S): ApplicationActions[S, E] = new ApplicationActions[S, E] {
     def QueryAction(block: QueryBlock[AnyContent]) = outer.QueryAction { state => request =>
       block(f(state))(request)

@@ -18,78 +18,78 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     "list posts" in new fixture {
       given(PostAdded(postId, currentUserId, postContent): PostEvent)
 
-      val result = subject.index(FakeRequest())
+      val response = subject.index(FakeRequest())
 
-      status(result) must_== 200
-      contentAsString(result) must contain("<td>Joe</td>")
+      status(response) must_== 200
+      contentAsString(response) must contain("<td>Joe</td>")
     }
 
     "add post" in new fixture {
-      val result = subject.add.submit(postId)(authenticatedRequest.withFormUrlEncodedBody("title" -> "title", "body" -> "body"))
+      val response = subject.add.submit(postId)(authenticatedRequest.withFormUrlEncodedBody("title" -> "title", "body" -> "body"))
 
-      status(result) must_== 303
+      status(response) must_== 303
       changes must_== Seq(PostAdded(postId, currentUserId, postContent))
     }
 
     "not allow adding post when not logged in" in new fixture {
-      val result = subject.add.submit(postId)(unauthenticatedRequest.withFormUrlEncodedBody("title" -> "title", "body" -> "body"))
+      val response = subject.add.submit(postId)(unauthenticatedRequest.withFormUrlEncodedBody("title" -> "title", "body" -> "body"))
 
-      status(result) must_== 404
+      status(response) must_== 404
       changes must beEmpty
     }
 
     "edit post" in new fixture {
       given(PostAdded(postId, currentUserId, postContent): PostEvent)
 
-      val result = subject.edit.submit(postId, StreamRevision(1))(authenticatedRequest.withFormUrlEncodedBody("title" -> "edited title", "body" -> "edited body"))
+      val response = subject.edit.submit(postId, StreamRevision(1))(authenticatedRequest.withFormUrlEncodedBody("title" -> "edited title", "body" -> "edited body"))
 
-      status(result) must_== 303
+      status(response) must_== 303
       changes must_== Seq(PostEdited(postId, PostContent(title = "edited title", body = "edited body")))
     }
 
     "not allow editing by unauthorized user" in new fixture {
       given(PostAdded(postId, currentUserId, postContent): PostEvent)
 
-      val result = subject.edit.submit(postId, StreamRevision(1))(FakeRequest().withFormUrlEncodedBody("title" -> "edited title", "body" -> "edited body"))
+      val response = subject.edit.submit(postId, StreamRevision(1))(FakeRequest().withFormUrlEncodedBody("title" -> "edited title", "body" -> "edited body"))
 
-      status(result) must_== 404
+      status(response) must_== 404
       changes must beEmpty
     }
 
     "delete post" in new fixture {
       given(PostAdded(postId, currentUserId, postContent): PostEvent)
 
-      val result = subject.delete(postId, StreamRevision(1))(authenticatedRequest)
+      val response = subject.delete(postId, StreamRevision(1))(authenticatedRequest)
 
-      status(result) must_== 303
-      header("Location", result) must beSome("/posts/")
+      status(response) must_== 303
+      header("Location", response) must beSome("/posts/")
       changes must_== Seq(PostDeleted(postId))
     }
 
     "not allow deleting post by unauthorized user" in new fixture {
       given(PostAdded(postId, currentUserId, postContent): PostEvent)
 
-      val result = subject.delete(postId, StreamRevision(1))(unauthenticatedRequest)
+      val response = subject.delete(postId, StreamRevision(1))(unauthenticatedRequest)
 
-      status(result) must_== 404
+      status(response) must_== 404
       changes must beEmpty
     }
 
     "add comment to post when logged in" in new fixture {
       given(PostAdded(postId, currentUserId, postContent): PostEvent)
 
-      val result = subject.comments.add(postId, StreamRevision(1))(authenticatedRequest.withFormUrlEncodedBody("body" -> "Body"))
+      val response = subject.comments.add(postId, StreamRevision(1))(authenticatedRequest.withFormUrlEncodedBody("body" -> "Body"))
 
-      status(result) must_== 303
+      status(response) must_== 303
       changes must_== Seq(CommentAdded(postId, CommentId(1), CommentContent(Left(currentUserId), "Body")))
     }
 
     "add comment to post when not logged in" in new fixture {
       given(PostAdded(postId, currentUserId, postContent): PostEvent)
 
-      val result = subject.comments.add(postId, StreamRevision(1))(unauthenticatedRequest.withFormUrlEncodedBody("name" -> "Commenter", "body" -> "Body"))
+      val response = subject.comments.add(postId, StreamRevision(1))(unauthenticatedRequest.withFormUrlEncodedBody("name" -> "Commenter", "body" -> "Body"))
 
-      status(result) must_== 303
+      status(response) must_== 303
       changes must_== Seq(CommentAdded(postId, CommentId(1), CommentContent(Right("Commenter"), "Body")))
     }
 
@@ -98,9 +98,9 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
         PostAdded(postId, currentUserId, postContent): PostEvent,
         CommentAdded(postId, CommentId(1), CommentContent(Right("Commenter"), "Body")): PostEvent)
 
-      val result = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(authenticatedRequest)
+      val response = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(authenticatedRequest)
 
-      status(result) must_== 303
+      status(response) must_== 303
       changes must_== Seq(CommentDeleted(postId, CommentId(1)))
     }
 
@@ -109,9 +109,9 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
         PostAdded(postId, UserId.generate(), postContent): PostEvent,
         CommentAdded(postId, CommentId(1), CommentContent(Left(currentUserId), "Body")): PostEvent)
 
-      val result = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(authenticatedRequest)
+      val response = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(authenticatedRequest)
 
-      status(result) must_== 303
+      status(response) must_== 303
       changes must_== Seq(CommentDeleted(postId, CommentId(1)))
     }
 
@@ -120,45 +120,14 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
         PostAdded(postId, UserId.generate(), postContent): PostEvent,
         CommentAdded(postId, CommentId(1), CommentContent(Left(UserId.generate()), "Body")): PostEvent)
 
-      val result = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(authenticatedRequest)
+      val response = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(authenticatedRequest)
 
-      status(result) must_== 404
+      status(response) must_== 404
       changes must beEmpty
     }
   }
 
-  val password = Password.fromPlainText("password")
-  trait fixture extends After { self =>
-    Play.start(FakeApplication())
-
-    val currentUserId = UserId.generate()
-    val authenticationToken = AuthenticationToken.generate()
-    val unauthenticatedRequest = FakeRequest()
-    val authenticatedRequest = FakeRequest().withSession("authenticationToken" -> authenticationToken.toString)
-
-    val eventStore: EventStore[PostEvent] = new fake.FakeEventStore
-
-    var initialStoreRevision = eventStore.reader.storeRevision
-    def given[StreamId, Event <: PostEvent](events: Event*)(implicit eventStreamType: EventStreamType[StreamId, Event]) {
-      for (event <- events) {
-        val revision = eventStore.reader.streamRevision(eventStreamType.streamId(event))
-        eventStore.committer.tryCommit(Changes(revision, event)) must beRight
-      }
-      initialStoreRevision = eventStore.reader.storeRevision
-    }
-
-    val memoryImage = MemoryImage[Posts, PostEvent](eventStore)(Posts()) {
-      (state, commit) => state.updateMany(commit.eventsWithRevision, _ => Some(registeredUser))
-    }
-
-    def changes = eventStore.reader.readCommits(initialStoreRevision, StoreRevision.Maximum).flatMap(_.events).toSeq
-
-    val registeredUser = RegisteredUser(currentUserId, StreamRevision.Initial, EmailAddress("joe@example.com"), "Joe", password)
-    val subject = new PostsController(new MemoryImageActions(memoryImage, (_, _) => Some(registeredUser), (_, _) => _ => true))
-
-    override def after {
-      eventStore.close
-      Play.stop()
-    }
+  trait fixture extends ControllerFixture {
+    val subject = new PostsController(new MemoryImageActions(memoryImage).view(_.posts))
   }
 }
