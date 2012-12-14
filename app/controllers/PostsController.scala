@@ -4,12 +4,9 @@ import events._
 import eventstore._
 import eventstore.Transaction._
 import models._
-import play.api._
-import play.api.mvc._
 import play.api.data._
 import play.api.data.Forms._
 import play.api.data.validation.Constraints._
-import scala.annotation.tailrec
 import support.Forms._
 
 object PostsController extends PostsController(Global.MemoryImageActions.view(_.posts))

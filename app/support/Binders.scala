@@ -1,8 +1,6 @@
 package support
 
-import events.CommentId
-import events.Identifier
-import events.IdentifierCompanion
+import events._
 import eventstore.{ StoreRevision, StreamRevision }
 import java.net.URLDecoder
 import java.util.UUID

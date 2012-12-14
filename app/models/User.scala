@@ -3,7 +3,11 @@ package models
 import events._
 import eventstore._
 
-trait User {
+trait UserContext {
+  def users: Users
+}
+
+sealed trait User {
   def displayName: String
 
   def registered: Option[RegisteredUser] = None
@@ -13,18 +17,26 @@ trait User {
   def canDeletePost(post: Post): Boolean = false
   def canDeleteComment(post: Post, comment: Comment): Boolean = false
 
-  def authorizeEvent(state: ApplicationState): DomainEvent => Boolean
+  def authorizeEvent(state: ApplicationState): DomainEvent => Boolean = _ => false
 }
-case object Guest extends User {
+
+case object GuestUser extends User {
   def displayName = "Guest"
 
-  def authorizeEvent(state: ApplicationState): DomainEvent => Boolean = {
+  override def authorizeEvent(state: ApplicationState): DomainEvent => Boolean = {
     case _: UserRegistered => true
     case _: UserLoggedIn   => true
     case _: CommentAdded   => true
     case _                 => false
   }
 }
+
+case class PseudonymousUser(displayName: String) extends User
+
+case class UnknownUser(id: UserId) extends User {
+  def displayName = "[unknown]"
+}
+
 case class RegisteredUser(id: UserId, revision: StreamRevision, emailAddress: EmailAddress, displayName: String, password: Password, authenticationToken: Option[AuthenticationToken] = None) extends User {
   override def registered = Some(this)
 
@@ -33,7 +45,7 @@ case class RegisteredUser(id: UserId, revision: StreamRevision, emailAddress: Em
   override def canDeletePost(post: Post) = post.isAuthoredBy(this)
   override def canDeleteComment(post: Post, comment: Comment) = post.isAuthoredBy(this) || comment.isAuthoredBy(this)
 
-  def authorizeEvent(state: ApplicationState): DomainEvent => Boolean = {
+  override def authorizeEvent(state: ApplicationState): DomainEvent => Boolean = {
     case event: UserRegistered      => false
     case event: UserPasswordChanged => id == event.userId
     case event: UserLoggedIn        => true
@@ -55,26 +67,37 @@ case class RegisteredUser(id: UserId, revision: StreamRevision, emailAddress: Em
   }
 }
 
-case class Users(byId: Map[UserId, RegisteredUser] = Map.empty, byLogin: Map[EmailAddress, UserId] = Map.empty, byAuthenticationToken: Map[AuthenticationToken, UserId] = Map.empty) {
-  def get(login: EmailAddress) = byLogin.get(login).map(byId)
+case class Users(
+    private val byId: Map[UserId, RegisteredUser] = Map.empty,
+    private val byEmail: Map[EmailAddress, UserId] = Map.empty,
+    private val byAuthenticationToken: Map[AuthenticationToken, UserId] = Map.empty) {
 
-  def authenticated(authenticationToken: AuthenticationToken): Option[RegisteredUser] = byAuthenticationToken.get(authenticationToken).map(byId)
+  def get(id: UserId): Option[RegisteredUser] = byId.get(id)
 
-  def updateMany(events: Seq[(UserEvent, StreamRevision)]): Users = events.foldLeft(this) { (state, change) =>
-    val (event, streamRevision) = change
-    state.update(event, streamRevision)
-  }
+  def withEmail(email: EmailAddress): Option[RegisteredUser] =
+    byEmail.get(email).flatMap(get)
+
+  def withAuthenticationToken(token: AuthenticationToken): Option[RegisteredUser] =
+    byAuthenticationToken.get(token).flatMap(get)
+
+  def authenticate(email: EmailAddress, password: String): Option[(RegisteredUser, AuthenticationToken)] =
+    withEmail(email).filter(_.password.verify(password)).map { (_, AuthenticationToken.generate) }
+
   def update(event: UserEvent, revision: StreamRevision): Users = event match {
-    case UserRegistered(userId, login, displayName, password) =>
-      val user = RegisteredUser(userId, revision, login, displayName, password)
-      copy(byId = byId.updated(userId, user), byLogin = byLogin.updated(login, userId))
+    case UserRegistered(userId, email, displayName, password) =>
+      val user = RegisteredUser(userId, revision, email, displayName, password)
+      copy(byId = byId.updated(userId, user), byEmail = byEmail.updated(email, userId))
+
     case UserPasswordChanged(userId, password) =>
-      copy(byId = byId.updated(userId, byId(userId).copy(revision = revision, password = password)))
+      val user = byId(userId)
+      copy(byId = byId.updated(userId, user.copy(revision = revision, password = password)))
+
     case UserLoggedIn(userId, authenticationToken) =>
       val user = byId(userId)
       copy(
         byId = byId.updated(userId, byId(userId).copy(revision = revision, authenticationToken = Some(authenticationToken))),
         byAuthenticationToken = user.authenticationToken.foldLeft(byAuthenticationToken) { _ - _ }.updated(authenticationToken, userId))
+
     case UserLoggedOut(userId) =>
       val user = byId(userId)
       copy(

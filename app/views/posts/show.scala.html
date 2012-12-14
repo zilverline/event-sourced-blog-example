@@ -3,7 +3,7 @@
 
 @main(post.content.title) {
   <div class="well">
-    <p>@post.content.body -- <em>by @post.authorDisplayName</em></p>
+    <p>@post.content.body -- <em>by @post.author.displayName</em></p>
     <div class="btn-group">
       @if(request.currentUser.canEditPost(post)) {
         <a class="btn" href="@routes.PostsController.edit.show(post.id)">Edit</a>
@@ -17,7 +17,7 @@
     @for((commentId, comment) <- post.comments) {
       <br/>
       <div style="display: inline-block;">
-        @comment.content.body -- <em>by @comment.commenterDisplayName</em>
+        @comment.content.body -- <em>by @comment.commenter.displayName</em>
         @if(request.currentUser.canDeleteComment(post, comment)) {
           &nbsp; <form class="form-inline" style="display: inline-block;" action="@routes.PostsController.comments.delete(post.id, post.revision, commentId)" method="POST">
             <fieldset><button>&times;</button></fieldset>

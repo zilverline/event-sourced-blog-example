@@ -9,7 +9,6 @@ import org.joda.time.DateTimeUtils
 import play.api.Logger
 import play.api.libs.json._
 import _root_.redis.clients.jedis._
-import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 
 object RedisEventStore {

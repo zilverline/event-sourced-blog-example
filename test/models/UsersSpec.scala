@@ -21,27 +21,26 @@ class UsersSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
     "contain registered users" in {
       val users = given(UserRegistered(A, emailAddress, displayName, password))
 
-      users.byId.get(A) must beSome(RegisteredUser(A, StreamRevision(1), emailAddress, displayName, password))
+      users.get(A) must beSome(RegisteredUser(A, StreamRevision(1), emailAddress, displayName, password))
     }
 
     "store most recent password for user" in {
       val users = given(UserRegistered(A, emailAddress, displayName, password), UserPasswordChanged(A, password2))
 
-      users.byId.get(A) must beSome(RegisteredUser(A, StreamRevision(2), emailAddress, displayName, password2))
+      users.get(A) must beSome(RegisteredUser(A, StreamRevision(2), emailAddress, displayName, password2))
     }
 
     "track current authentication token when logged in" in {
       val users = given(UserRegistered(A, emailAddress, displayName, password), UserLoggedIn(A, authenticationToken))
 
-      users.byAuthenticationToken.get(authenticationToken) must beSome(A)
-      users.byId.get(A) must beSome(RegisteredUser(A, StreamRevision(2), emailAddress, displayName, password, Some(authenticationToken)))
+      users.withAuthenticationToken(authenticationToken) must beSome(RegisteredUser(A, StreamRevision(2), emailAddress, displayName, password, Some(authenticationToken)))
     }
 
     "remove current authentication token logged out" in {
       val users = given(UserRegistered(A, emailAddress, displayName, password), UserLoggedIn(A, authenticationToken), UserLoggedOut(A))
 
-      users.byAuthenticationToken.get(authenticationToken) must beNone
-      users.byId.get(A) must beSome(RegisteredUser(A, StreamRevision(3), emailAddress, displayName, password, None))
+      users.withAuthenticationToken(authenticationToken) must beNone
+      users.get(A) must beSome(RegisteredUser(A, StreamRevision(3), emailAddress, displayName, password, None))
     }
 
     "remove previous authentication token when when logged in again" in {
@@ -50,9 +49,8 @@ class UsersSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
         UserLoggedIn(A, authenticationToken),
         UserLoggedIn(A, authenticationToken2))
 
-      users.byAuthenticationToken.get(authenticationToken) must beNone
-      users.byAuthenticationToken.get(authenticationToken2) must beSome(A)
-      users.byId.get(A) must beSome(RegisteredUser(A, StreamRevision(3), emailAddress, displayName, password, Some(authenticationToken2)))
+      users.withAuthenticationToken(authenticationToken) must beNone
+      users.withAuthenticationToken(authenticationToken2) must beSome(RegisteredUser(A, StreamRevision(3), emailAddress, displayName, password, Some(authenticationToken2)))
     }
 
     "load from history" in forAll(UserEventsSpec.eventsForMultipleUsers.arbitrary) { events =>

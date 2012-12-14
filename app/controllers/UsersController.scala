@@ -3,15 +3,10 @@ package controllers
 import events._
 import eventstore._
 import eventstore.Transaction._
-import java.security.SecureRandom
 import models._
-import play.api._
 import play.api.data._
 import play.api.data.Forms._
 import play.api.data.validation.Constraints._
-import play.api.http.HeaderNames
-import play.api.mvc._
-import scala.annotation.tailrec
 import support.Forms._
 
 object UsersController extends UsersController(Global.MemoryImageActions.view(_.users), Global.emailAddressRegistry)
@@ -19,9 +14,6 @@ class UsersController(actions: ApplicationActions[Users, UserEvent], registerEma
   import actions._
 
   object authentication {
-    def authenticate(users: Users)(login: EmailAddress, password: String): Option[(RegisteredUser, AuthenticationToken)] =
-      users.get(login).filter(_.password.verify(password)).map { user => (user, AuthenticationToken.generate) }
-
     val loginForm: Form[(EmailAddress, String)] = Form(tuple(
       "email" -> email.transform[EmailAddress](EmailAddress.apply, _.value),
       "password" -> text.transform[String](identity, _ => "")))
@@ -33,17 +25,15 @@ class UsersController(actions: ApplicationActions[Users, UserEvent], registerEma
       form.fold(
         formWithErrors =>
           abort(BadRequest(views.html.users.log_in(formWithErrors))),
-        credentials => {
-          val (email, password) = credentials
-          authenticate(users)(email, password) map {
+        credentials =>
+          users.authenticate(credentials._1, credentials._2) map {
             case (user, token) =>
               Changes(user.revision, UserLoggedIn(user.id, token): UserEvent).commit(
                 onCommit = Redirect(routes.UsersController.authentication.loggedIn).withSession("authenticationToken" -> token.toString),
                 onConflict = conflict => sys.error("impossible conflict: " + conflict))
           } getOrElse {
             abort(BadRequest(views.html.users.log_in(form.addError(FormError("", "bad.credentials")))))
-          }
-        })
+          })
     }
 
     def logOut = CommandAction { state => implicit request =>

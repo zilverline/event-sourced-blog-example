@@ -17,8 +17,8 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
     val Updated = Content.copy(body = "updated")
 
     "contain post with content from last non-delete event" in {
-      given event PostAdded(A, Author, Content) thenPostWithId A must beSome(Post(A, StreamRevision(1), Author, AuthorDisplayName, Content))
-      given events (PostAdded(A, Author, Content), PostEdited(A, Updated)) thenPostWithId A must beSome(Post(A, StreamRevision(2), Author, AuthorDisplayName, Updated))
+      given event PostAdded(A, Author, Content) thenPostWithId A must beSome(Post(A, StreamRevision(1), Author, Content))
+      given events (PostAdded(A, Author, Content), PostEdited(A, Updated)) thenPostWithId A must beSome(Post(A, StreamRevision(2), Author, Updated))
       given events (PostAdded(A, Author, Content), PostDeleted(A)) thenPostWithId A must beNone
 
       forAllNoShrink(arbitrary(eventsForSinglePost(A))) { events =>
@@ -33,9 +33,9 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
     }
 
     "contain all non-deleted posts in reverse order of adding" in {
-      given event PostAdded(A, Author, Content) thenMostRecent 1 must_== Seq(Post(A, StreamRevision(1), Author, AuthorDisplayName, Content))
-      given events (PostAdded(A, Author, Content), PostAdded(B, Author, Updated)) thenMostRecent 2 must_== Seq(Post(B, StreamRevision(1), Author, AuthorDisplayName, Updated), Post(A, StreamRevision(1), Author, AuthorDisplayName, Content))
-      given events (PostAdded(A, Author, Content), PostEdited(A, Updated)) thenMostRecent 1 must_== Seq(Post(A, StreamRevision(2), Author, AuthorDisplayName, Updated))
+      given event PostAdded(A, Author, Content) thenMostRecent 1 must_== Seq(Post(A, StreamRevision(1), Author, Content))
+      given events (PostAdded(A, Author, Content), PostAdded(B, Author, Updated)) thenMostRecent 2 must_== Seq(Post(B, StreamRevision(1), Author, Updated), Post(A, StreamRevision(1), Author, Content))
+      given events (PostAdded(A, Author, Content), PostEdited(A, Updated)) thenMostRecent 1 must_== Seq(Post(A, StreamRevision(2), Author, Updated))
       given events (PostAdded(A, Author, Content), PostDeleted(A)) thenMostRecent 1 must beEmpty
 
       forAllNoShrink(arbitrary(eventsForMultiplePosts)) { events =>
@@ -49,15 +49,15 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
 
     val CommentContent_1 = CommentContent(Right("Commenter"), "Body 1")
     "track comments and the next comment id" in {
-      given events (PostAdded(A, Author, Content), CommentAdded(A, CommentId(1), CommentContent_1)) thenPostWithId A must beSome(Post(A, StreamRevision(2), Author, AuthorDisplayName, Content, CommentId(2), SortedMap(CommentId(1) -> Comment(CommentId(1), "Commenter", CommentContent_1))))
-      given events (PostAdded(A, Author, Content), CommentAdded(A, CommentId(1), CommentContent_1), CommentDeleted(A, CommentId(1))) thenPostWithId A must beSome(Post(A, StreamRevision(3), Author, AuthorDisplayName, Content, CommentId(2), SortedMap.empty))
+      given events (PostAdded(A, Author, Content), CommentAdded(A, CommentId(1), CommentContent_1)) thenPostWithId A must beSome(Post(A, StreamRevision(2), Author, Content, CommentId(2), SortedMap(CommentId(1) -> Comment(CommentId(1), CommentContent_1))))
+      given events (PostAdded(A, Author, Content), CommentAdded(A, CommentId(1), CommentContent_1), CommentDeleted(A, CommentId(1))) thenPostWithId A must beSome(Post(A, StreamRevision(3), Author, Content, CommentId(2), SortedMap.empty))
 
       forAllNoShrink(arbitrary(eventsForSinglePost(A))) { events =>
         !events.last.isInstanceOf[PostDeleted] ==> {
           val post = given.events(events: _*).posts.get(A).getOrElse(failure("post not found"))
           val commentsAdded = events.collect { case e: CommentAdded => e }
           val commentsDeleted = events.collect { case e: CommentDeleted => e }.map(_.commentId).toSet
-          val remaining = commentsAdded.filterNot(e => commentsDeleted.contains(e.commentId)).map(e => (e.commentId, Comment(e.commentId, e.content.commenter.fold(_ => "Joe", identity), e.content))).toMap
+          val remaining = commentsAdded.filterNot(e => commentsDeleted.contains(e.commentId)).map(e => (e.commentId, Comment(e.commentId, e.content))).toMap
 
           post.nextCommentId must_== CommentId(commentsAdded.size + 1)
           remaining must_== post.comments
@@ -75,7 +75,7 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
         val eventStore = FakeEventStore.fromHistory(events)
         try {
           val commits = eventStore.reader.readCommits(StoreRevision.Initial, StoreRevision.Maximum)
-          commits.flatMap(_.eventsWithRevision).foldLeft(Posts())((posts, event) => posts.update(event._1, event._2, userId => Some(RegisteredUser(userId, StreamRevision(1), EmailAddress("joe@example.com"), "Joe", password))))
+          commits.flatMap(_.eventsWithRevision).foldLeft(Posts())((posts, event) => posts.update(event._1, event._2))
         } finally {
           eventStore.close
         }

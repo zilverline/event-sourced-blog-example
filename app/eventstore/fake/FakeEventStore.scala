@@ -4,7 +4,6 @@ package fake
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.joda.time.DateTimeUtils
-import scala.annotation.tailrec
 import scala.concurrent.stm._
 
 object FakeEventStore {
@@ -76,7 +75,7 @@ class FakeEventStore[Event] extends EventStore[Event] {
       val last = Ref(since).single
 
       executor.execute(new Runnable {
-        @tailrec override def run {
+        @annotation.tailrec override def run {
           val pending = atomic { implicit txn =>
             if (closed() || cancelled()) None else {
               val pending = commits().drop(last().value.toInt)

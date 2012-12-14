@@ -5,6 +5,10 @@ import eventstore._
 import models._
 import play.api.mvc._
 
+/**
+ * Implements `ApplicationActions` using the (global) memory image containing the
+ * `ApplicationState`.
+ */
 class MemoryImageActions(memoryImage: MemoryImage[ApplicationState, DomainEvent])
     extends ApplicationActions[ApplicationState, DomainEvent] {
 
@@ -26,7 +30,7 @@ class MemoryImageActions(memoryImage: MemoryImage[ApplicationState, DomainEvent]
 
   private def buildApplicationRequest[A](state: ApplicationState)(implicit request: Request[A]): ApplicationRequest[A] = {
     val authenticationToken = request.session.get("authenticationToken").flatMap(AuthenticationToken.fromString)
-    val authenticatedUser = authenticationToken.flatMap(token => state.users.authenticated(token))
-    new ApplicationRequest(authenticatedUser getOrElse Guest, state.users, request)
+    val authenticatedUser = authenticationToken.flatMap(state.users.withAuthenticationToken)
+    new ApplicationRequest(authenticatedUser getOrElse GuestUser, state.users, request)
   }
 }

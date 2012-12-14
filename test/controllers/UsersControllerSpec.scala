@@ -23,14 +23,14 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
       claimedUserIds += email -> userId
       val request = FakeRequest().withFormUrlEncodedBody("email" -> "john@example.com", "displayName" -> "John Doe", "password.1" -> "password", "password.2" -> "password")
 
-      val result = subject.register.submit(request)
+      val response = subject.register.submit(request)
 
-      status(result) must_== 303
+      status(response) must_== 303
       changes must have size(1)
       changes(0) must beAnInstanceOf[UserRegistered]
 
       val event = changes(0).asInstanceOf[UserRegistered]
-      event.login must_== EmailAddress("john@example.com")
+      event.email must_== email
       event.password.verify("password") aka "password verified" must beTrue
       event.userId aka "claimed user id" must_== userId
     }
@@ -38,10 +38,10 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
     "allow registered user to log in" in new fixture {
       given(UserRegistered(userId, email, displayName, password): UserEvent)
 
-      val result = subject.authentication.submit(FakeRequest().withFormUrlEncodedBody("email" -> email.value, "password" -> "password"))
+      val response = subject.authentication.submit(FakeRequest().withFormUrlEncodedBody("email" -> email.value, "password" -> "password"))
 
-      status(result) must_== 303
-      val token = session(result).get("authenticationToken").flatMap(AuthenticationToken.fromString) getOrElse { failure("authentication token not created") }
+      status(response) must_== 303
+      val token = session(response).get("authenticationToken").flatMap(AuthenticationToken.fromString) getOrElse { failure("authentication token not created") }
       changes must_== Seq(UserLoggedIn(userId, token))
     }
 
@@ -50,10 +50,10 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
           UserRegistered(userId, email, displayName, password): UserEvent,
           UserLoggedIn(userId, authenticationToken): UserEvent)
 
-      val result = subject.authentication.logOut(FakeRequest().withSession("authenticationToken" -> authenticationToken.toString))
+      val response = subject.authentication.logOut(FakeRequest().withSession("authenticationToken" -> authenticationToken.toString))
 
-      status(result) must_== 303
-      session(result) must beEmpty
+      status(response) must_== 303
+      session(response) must beEmpty
       changes must_== Seq(UserLoggedOut(userId))
     }
   }

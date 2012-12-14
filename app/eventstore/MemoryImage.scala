@@ -1,7 +1,6 @@
 package eventstore
 
 import scala.concurrent.stm._
-import scala.annotation.tailrec
 
 /**
  * The transaction to commit to the event when modifying the memory image.
@@ -79,7 +78,7 @@ class MemoryImage[State, -Event: Manifest] private (eventStore: EventStore[Event
    * conflict is detected, so the provided `body` must be side-effect free.
    */
   def modify[A, E <: Event](body: State => Transaction[E, A]): A = {
-    @tailrec def runTransaction(minimum: StoreRevision): A = {
+    @annotation.tailrec def runTransaction(minimum: StoreRevision): A = {
       val (state, transactionRevision) = getWithRevisionAt(minimum)
       body(state) match {
         case TransactionAbort(onAbort) =>

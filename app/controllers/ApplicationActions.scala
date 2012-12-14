@@ -6,16 +6,17 @@ import models._
 import play.api.mvc._
 import play.api.mvc.Results._
 
-trait ApplicationRequestHeader extends RequestHeader {
+/**
+ * Extend Play's `Request` with user information.
+ */
+trait ApplicationRequestHeader extends RequestHeader with UserContext {
+  /**
+   * The current authenticated user or the guest user.
+   */
   def currentUser: User
-  def findUser(id: UserId): Option[User]
 }
-class ApplicationRequest[A](
-    val currentUser: User,
-    users: Users,
-    request: Request[A]) extends WrappedRequest(request) with ApplicationRequestHeader {
-  def findUser(id: UserId) = users.byId.get(id)
-}
+class ApplicationRequest[A](val currentUser: User, val users: Users, request: Request[A])
+    extends WrappedRequest(request) with ApplicationRequestHeader
 
 /**
  * Actions available to a controller that makes use of a memory image.
@@ -88,7 +89,7 @@ trait ApplicationActions[State, -Event] extends Controller { outer =>
   }
 
   /**
-   * 404 Not Found response.
+   * A simple `404 Not Found` response.
    */
   def notFound(implicit request: Request[_]): Result = NotFound(views.html.defaultpages.notFound(request, None))
 }

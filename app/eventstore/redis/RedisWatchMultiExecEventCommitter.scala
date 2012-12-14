@@ -4,7 +4,6 @@ package redis
 import org.joda.time.DateTimeUtils
 import play.api.libs.json._
 import _root_.redis.clients.jedis._
-import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 
 /**
@@ -25,7 +24,7 @@ trait RedisWatchMultiExecEventCommitter[Event] { this: RedisEventStore[Event] =>
       val streamId = descriptor.toString(changes.streamId)
       val streamKey = keyForStream(streamId)
       val result = withJedis { implicit jedis =>
-        @tailrec def tryCommitWithRetry: Either[StreamRevision, Commit[E]] = {
+        @annotation.tailrec def tryCommitWithRetry: Either[StreamRevision, Commit[E]] = {
           val (storeRevision, actual) = prepareCommit(streamKey)
 
           if (changes.expected != actual) {
