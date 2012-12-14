@@ -5,8 +5,8 @@ import play.api.mvc._
 import eventstore.MemoryImage
 import models.ApplicationState
 
-object Application extends ApplicationController[Nothing] {
-  override def memoryImage = Global.persistence.memoryImage
+object Application {
+  import Global.MemoryImageActions._
 
   def index = ApplicationAction { implicit request =>
     Ok(views.html.index())

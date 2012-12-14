@@ -29,6 +29,10 @@ case class Posts(byId: Map[PostId, Post] = Map.empty, orderedByTimeAdded: Seq[Po
   def get(id: PostId): Option[Post] = byId.get(id)
   def mostRecent(n: Int): Seq[Post] = orderedByTimeAdded.takeRight(n).reverse.map(byId)
 
+  def updateMany(events: Seq[(PostEvent, StreamRevision)], findUser: UserId => Option[User]): Posts = events.foldLeft(this) { (state, change) =>
+    val (event, streamRevision) = change
+    state.update(event, streamRevision, findUser)
+  }
   def update(event: PostEvent, revision: StreamRevision, findUser: UserId => Option[User]): Posts = {
     def displayName(userId: UserId) = findUser(userId).map(_.displayName).getOrElse("(unknown)")
     event match {

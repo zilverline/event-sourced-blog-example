@@ -14,8 +14,10 @@ import play.api.mvc._
 import scala.annotation.tailrec
 import support.Forms._
 
-object UsersController extends UsersController(Global.persistence.memoryImage, Global.emailAddressRegistry)
-class UsersController(override val memoryImage: MemoryImage[ApplicationState, UserEvent], registerEmailAddress: EmailAddress => UserId) extends ApplicationController[UserEvent] {
+object UsersController extends UsersController(Global.MemoryImageActions.view(_.users), Global.emailAddressRegistry)
+class UsersController(actions: ApplicationActions[Users, UserEvent], registerEmailAddress: EmailAddress => UserId) {
+  import actions._
+
   object authentication {
     def authenticate(users: Users)(login: EmailAddress, password: String): Option[(RegisteredUser, AuthenticationToken)] =
       users.get(login).filter(_.password.verify(password)).map { user => (user, AuthenticationToken.generate) }
@@ -26,14 +28,14 @@ class UsersController(override val memoryImage: MemoryImage[ApplicationState, Us
 
     def show = ApplicationAction { implicit request => Ok(views.html.users.log_in(loginForm)) }
 
-    def submit = CommandAction { state => implicit request =>
+    def submit = CommandAction { users => implicit request =>
       val form = loginForm.bindFromRequest
       form.fold(
         formWithErrors =>
           abort(BadRequest(views.html.users.log_in(formWithErrors))),
         credentials => {
           val (email, password) = credentials
-          authenticate(state.users)(email, password) map {
+          authenticate(users)(email, password) map {
             case (user, token) =>
               Changes(user.revision, UserLoggedIn(user.id, token): UserEvent).commit(
                 onCommit = Redirect(routes.UsersController.authentication.loggedIn).withSession("authenticationToken" -> token.toString),

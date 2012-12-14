@@ -136,10 +136,10 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     val unauthenticatedRequest = FakeRequest()
     val authenticatedRequest = FakeRequest().withSession("authenticationToken" -> authenticationToken.toString)
 
-    val eventStore: EventStore[DomainEvent] = new fake.FakeEventStore
+    val eventStore: EventStore[PostEvent] = new fake.FakeEventStore
 
     var initialStoreRevision = eventStore.reader.storeRevision
-    def given[StreamId, Event <: DomainEvent](events: Event*)(implicit eventStreamType: EventStreamType[StreamId, Event]) {
+    def given[StreamId, Event <: PostEvent](events: Event*)(implicit eventStreamType: EventStreamType[StreamId, Event]) {
       for (event <- events) {
         val revision = eventStore.reader.streamRevision(eventStreamType.streamId(event))
         eventStore.committer.tryCommit(Changes(revision, event)) must beRight
@@ -147,17 +147,14 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
       initialStoreRevision = eventStore.reader.storeRevision
     }
 
-    val memoryImage = MemoryImage[ApplicationState, DomainEvent](eventStore)(ApplicationState()) {
-      (state, commit) => state.updateMany(commit.eventsWithRevision)
+    val memoryImage = MemoryImage[Posts, PostEvent](eventStore)(Posts()) {
+      (state, commit) => state.updateMany(commit.eventsWithRevision, _ => Some(registeredUser))
     }
 
     def changes = eventStore.reader.readCommits(initialStoreRevision, StoreRevision.Maximum).flatMap(_.events).toSeq
 
-    given(
-      UserRegistered(currentUserId, EmailAddress("joe@example.com"), "Joe", password): UserEvent,
-      UserLoggedIn(currentUserId, authenticationToken): UserEvent)
-
-    val subject = new PostsController(memoryImage)
+    val registeredUser = RegisteredUser(currentUserId, StreamRevision.Initial, EmailAddress("joe@example.com"), "Joe", password)
+    val subject = new PostsController(new MemoryImageActions(memoryImage, (_, _) => Some(registeredUser), (_, _) => _ => true))
 
     override def after {
       eventStore.close

@@ -50,6 +50,11 @@ object Global extends GlobalSettings {
     RedisEmailRegistry.claim(jedis, redisKey)
   }
 
+  object MemoryImageActions extends MemoryImageActions[ApplicationState, DomainEvent](
+      persistence.memoryImage,
+      (token, state) => state.users.authenticated(token),
+      (user, state) => user.authorizeEvent(state))
+
   override def onStart(app: Application) {
     initializeMemoryImage
   }

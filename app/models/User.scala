@@ -60,6 +60,10 @@ case class Users(byId: Map[UserId, RegisteredUser] = Map.empty, byLogin: Map[Ema
 
   def authenticated(authenticationToken: AuthenticationToken): Option[RegisteredUser] = byAuthenticationToken.get(authenticationToken).map(byId)
 
+  def updateMany(events: Seq[(UserEvent, StreamRevision)]): Users = events.foldLeft(this) { (state, change) =>
+    val (event, streamRevision) = change
+    state.update(event, streamRevision)
+  }
   def update(event: UserEvent, revision: StreamRevision): Users = event match {
     case UserRegistered(userId, login, displayName, password) =>
       val user = RegisteredUser(userId, revision, login, displayName, password)

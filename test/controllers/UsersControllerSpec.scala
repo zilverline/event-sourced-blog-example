@@ -60,11 +60,11 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
     val claimedUserIds = collection.mutable.Map.empty[EmailAddress, UserId]
     val eventStore: EventStore[UserEvent] = new fake.FakeEventStore
 
-    val memoryImage = MemoryImage[ApplicationState, UserEvent](eventStore)(ApplicationState()) {
+    private val memoryImage = MemoryImage[Users, UserEvent](eventStore)(Users()) {
       (state, commit) => state.updateMany(commit.eventsWithRevision)
     }
 
-    val subject = new UsersController(memoryImage, email => claimedUserIds.getOrElseUpdate(email, UserId.generate()))
+    val subject = new UsersController(new MemoryImageActions(memoryImage, (token, users) => users.authenticated(token), (user, state) => _ => true), email => claimedUserIds.getOrElseUpdate(email, UserId.generate()))
 
     def given(events: UserEvent*)(implicit eventStreamType: EventStreamType[UserId, UserEvent]) {
       for (event <- events) {
@@ -73,7 +73,7 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
       }
     }
 
-    def users = memoryImage.get.users
+    def users = memoryImage.get
 
     override def after {
       Play.stop()

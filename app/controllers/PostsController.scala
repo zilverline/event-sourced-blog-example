@@ -1,7 +1,8 @@
 package controllers
 
 import events._
-import eventstore._, Transaction._
+import eventstore._
+import eventstore.Transaction._
 import models._
 import play.api._
 import play.api.mvc._
@@ -11,8 +12,10 @@ import play.api.data.validation.Constraints._
 import scala.annotation.tailrec
 import support.Forms._
 
-object PostsController extends PostsController(Global.persistence.memoryImage)
-class PostsController(override val memoryImage: MemoryImage[ApplicationState, PostEvent]) extends ApplicationController[PostEvent] {
+object PostsController extends PostsController(Global.MemoryImageActions.view(_.posts))
+class PostsController(actions: ApplicationActions[Posts, PostEvent]) {
+  import actions._
+
   /**
    * Blog content form definition.
    */
@@ -23,15 +26,15 @@ class PostsController(override val memoryImage: MemoryImage[ApplicationState, Po
   /**
    * Show an overview of the most recent blog posts.
    */
-  def index = QueryAction { state => implicit request =>
-    Ok(views.html.posts.index(state.posts.mostRecent(20)))
+  def index = QueryAction { posts => implicit request =>
+    Ok(views.html.posts.index(posts.mostRecent(20)))
   }
 
   /**
    * Show a specific blog post.
    */
-  def show(id: PostId) = QueryAction { state => implicit request =>
-    state.posts.get(id) map { post =>
+  def show(id: PostId) = QueryAction { posts => implicit request =>
+    posts.get(id) map { post =>
       Ok(views.html.posts.show(post, comments.commentContentForm))
     } getOrElse {
       notFound
@@ -46,7 +49,7 @@ class PostsController(override val memoryImage: MemoryImage[ApplicationState, Po
       Ok(views.html.posts.add(PostId.generate(), postContentForm))
     }
 
-    def submit(id: PostId) = AuthenticatedCommandAction { user => state => implicit request =>
+    def submit(id: PostId) = AuthenticatedCommandAction { user => posts => implicit request =>
       postContentForm.bindFromRequest.fold(
         formWithErrors =>
           abort(BadRequest(views.html.posts.add(id, formWithErrors))),
@@ -61,16 +64,16 @@ class PostsController(override val memoryImage: MemoryImage[ApplicationState, Po
    * Show and submit actions for editing an existing blog post.
    */
   object edit {
-    def show(id: PostId) = AuthenticatedQueryAction { user => state => implicit request =>
-      state.posts.get(id).filter(user canEditPost _) map { post =>
+    def show(id: PostId) = AuthenticatedQueryAction { user => posts => implicit request =>
+      posts.get(id).filter(user.canEditPost) map { post =>
         Ok(views.html.posts.edit(post.id, post.revision, postContentForm.fill(post.content)))
       } getOrElse {
         notFound
       }
     }
 
-    def submit(id: PostId, expected: StreamRevision) = AuthenticatedCommandAction { user => state => implicit request =>
-      state.posts.get(id).filter(user canEditPost _) map { post =>
+    def submit(id: PostId, expected: StreamRevision) = AuthenticatedCommandAction { user => posts => implicit request =>
+      posts.get(id).filter(user.canEditPost) map { post =>
         postContentForm.bindFromRequest.fold(
           formWithErrors =>
             abort(BadRequest(views.html.posts.edit(id, expected, formWithErrors))),
@@ -87,14 +90,13 @@ class PostsController(override val memoryImage: MemoryImage[ApplicationState, Po
   /**
    * Delete a blog post.
    */
-  def delete(id: PostId, expected: StreamRevision) = AuthenticatedCommandAction { user => state => implicit request =>
-    def deletedResult = Redirect(routes.PostsController.index).flashing("info" -> "Post deleted.")
-    state.posts.get(id) map { post =>
+  def delete(id: PostId, expected: StreamRevision) = AuthenticatedCommandAction { user => posts => implicit request =>
+    posts.get(id).filter(user.canDeletePost) map { post =>
       Changes(expected, PostDeleted(id): PostEvent).commit(
-        onCommit = deletedResult,
-        onConflict = conflict => Conflict(views.html.posts.index(state.posts.mostRecent(20), conflict.events)))
+        onCommit = Redirect(routes.PostsController.index).flashing("info" -> "Post deleted."),
+        onConflict = conflict => Conflict(views.html.posts.index(posts.mostRecent(20), conflict.events)))
     } getOrElse {
-      abort(deletedResult)
+      abort(notFound)
     }
   }
 
@@ -113,8 +115,8 @@ class PostsController(override val memoryImage: MemoryImage[ApplicationState, Po
           "body" -> trimmedText.verifying(minLength(3)))(CommentContent.apply)(CommentContent.unapply)
       })
 
-    def add(postId: PostId, expected: StreamRevision) = CommandAction { state => implicit request =>
-      state.posts.get(postId) map { post =>
+    def add(postId: PostId, expected: StreamRevision) = CommandAction { posts => implicit request =>
+      posts.get(postId) map { post =>
         commentContentForm.bindFromRequest.fold(
           formWithErrors =>
             abort(BadRequest(views.html.posts.show(post, formWithErrors))),
@@ -127,11 +129,11 @@ class PostsController(override val memoryImage: MemoryImage[ApplicationState, Po
       }
     }
 
-    def delete(postId: PostId, expected: StreamRevision, commentId: CommentId) = AuthenticatedCommandAction { user => state => implicit request =>
+    def delete(postId: PostId, expected: StreamRevision, commentId: CommentId) = AuthenticatedCommandAction { user => posts => implicit request =>
       (for {
-        post <- state.posts.get(postId)
+        post <- posts.get(postId)
         comment <- post.comments.get(commentId)
-        if user canDeleteComment (post, comment)
+        if user.canDeleteComment(post, comment)
       } yield {
         Changes(expected, CommentDeleted(postId, commentId): PostEvent).commit(
           onCommit = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment deleted."),
