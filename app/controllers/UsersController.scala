@@ -14,9 +14,7 @@ class UsersController(actions: ApplicationActions[Users, UserEvent], registerEma
   import actions._
 
   object authentication {
-    val loginForm: Form[(EmailAddress, String)] = Form(tuple(
-      "email" -> email.transform[EmailAddress](EmailAddress.apply, _.value),
-      "password" -> text.transform[String](identity, _ => "")))
+    val loginForm = Form(tuple("email" -> emailAddress, "password" -> password))
 
     def show = ApplicationAction { implicit request => Ok(views.html.users.log_in(loginForm)) }
 
@@ -52,8 +50,8 @@ class UsersController(actions: ApplicationActions[Users, UserEvent], registerEma
 
   object register {
     val confirmPasswordMapping: Mapping[Password] = tuple(
-      "1" -> text.verifying(minLength(8)),
-      "2" -> text).
+      "1" -> password.verifying(minLength(8)),
+      "2" -> password).
       verifying("error.password.mismatch", fields => fields._1 == fields._2).
       transform(fields => Password.fromPlainText(fields._1), _ => ("", ""))
 
@@ -61,7 +59,7 @@ class UsersController(actions: ApplicationActions[Users, UserEvent], registerEma
      * Registration form.
      */
     val registrationForm: Form[(EmailAddress, String, Password)] = Form(tuple(
-      "email" -> email.transform[EmailAddress](EmailAddress.apply, _.value),
+      "email" -> emailAddress,
       "displayName" -> tokenizedText.verifying(minLength(2)),
       "password" -> confirmPasswordMapping))
 
