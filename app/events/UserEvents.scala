@@ -15,7 +15,10 @@ case class UserId(uuid: UUID) extends Identifier
 object UserId extends IdentifierCompanion[UserId]("UserId")
 
 case class EmailAddress(value: String) {
-  require(value matches """.+@.+\..+""", "invalid email address: " + value)
+  // Pattern copied from play.api.data.Forms.email.
+  require(
+    value matches """\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}\b""",
+    "invalid email address: " + value)
 
   override def toString = value
 }
@@ -61,8 +64,8 @@ object AuthenticationToken {
 
   implicit val AuthenticationTokenFormat: Format[AuthenticationToken] = valueFormat(AuthenticationToken.apply)(x => Some(x.toString))
 
-  private[this] val Pattern = """\b([0-9a-fA-F]{16})-([0-9a-fA-F]{16})\b""".r
-  private[this] val Random = new java.security.SecureRandom()
+  private val Pattern = """\b([0-9a-fA-F]{16})-([0-9a-fA-F]{16})\b""".r
+  private val Random = new java.security.SecureRandom()
 }
 
 /**
