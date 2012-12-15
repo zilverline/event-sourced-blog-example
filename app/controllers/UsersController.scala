@@ -16,13 +16,13 @@ class UsersController(actions: ApplicationActions[Users, UserEvent], registerEma
   object authentication {
     val loginForm = Form(tuple("email" -> emailAddress, "password" -> password))
 
-    def show = ApplicationAction { implicit request => Ok(views.html.users.log_in(loginForm)) }
+    def show = ApplicationAction { implicit request => Ok(views.html.users.logIn(loginForm)) }
 
     def submit = CommandAction { users => implicit request =>
       val form = loginForm.bindFromRequest
       form.fold(
         formWithErrors =>
-          abort(BadRequest(views.html.users.log_in(formWithErrors))),
+          abort(BadRequest(views.html.users.logIn(formWithErrors))),
         credentials =>
           users.authenticate(credentials._1, credentials._2) map {
             case (user, token) =>
@@ -30,7 +30,7 @@ class UsersController(actions: ApplicationActions[Users, UserEvent], registerEma
                 onCommit = Redirect(routes.UsersController.authentication.loggedIn).withSession("authenticationToken" -> token.toString),
                 onConflict = conflict => sys.error("impossible conflict: " + conflict))
           } getOrElse {
-            abort(BadRequest(views.html.users.log_in(form.addError(FormError("", "bad.credentials")))))
+            abort(BadRequest(views.html.users.logIn(form.addError(FormError("", "bad.credentials")))))
           })
     }
 
@@ -44,8 +44,8 @@ class UsersController(actions: ApplicationActions[Users, UserEvent], registerEma
       }
     }
 
-    def loggedIn = AuthenticatedQueryAction { _ => _ => implicit request => Ok(views.html.users.logged_in()) }
-    def loggedOut = ApplicationAction { implicit request => Ok(views.html.users.logged_out()) }
+    def loggedIn = AuthenticatedQueryAction { _ => _ => implicit request => Ok(views.html.users.loggedIn()) }
+    def loggedOut = ApplicationAction { implicit request => Ok(views.html.users.loggedOut()) }
   }
 
   object register {
