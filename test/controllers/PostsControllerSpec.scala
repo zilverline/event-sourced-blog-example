@@ -50,7 +50,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     "not allow editing by unauthorized user" in new fixture {
       given(PostAdded(postId, currentUserId, postContent): PostEvent)
 
-      val response = subject.edit.submit(postId, StreamRevision(1))(FakeRequest().withFormUrlEncodedBody("title" -> "edited title", "body" -> "edited body"))
+      val response = subject.edit.submit(postId, StreamRevision(1))(unauthenticatedRequest.withFormUrlEncodedBody("title" -> "edited title", "body" -> "edited body"))
 
       status(response) must_== 404
       changes must beEmpty

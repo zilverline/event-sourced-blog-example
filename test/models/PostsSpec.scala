@@ -1,9 +1,7 @@
 package models
 
-import org.scalacheck._, Arbitrary.arbitrary, Prop.{ forAll, forAllNoShrink }
 import events._, PostEventsSpec._
 import eventstore._
-import eventstore.fake.FakeEventStore
 import scala.collection.immutable.SortedMap
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
@@ -16,72 +14,78 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
     val Content = PostContent(title = "title", body = "body")
     val Updated = Content.copy(body = "updated")
 
-    "contain post with content from last non-delete event" in {
-      given event PostAdded(A, Author, Content) thenPostWithId A must beSome(Post(A, StreamRevision(1), Author, Content))
-      given events (PostAdded(A, Author, Content), PostEdited(A, Updated)) thenPostWithId A must beSome(Post(A, StreamRevision(2), Author, Updated))
-      given events (PostAdded(A, Author, Content), PostDeleted(A)) thenPostWithId A must beNone
+    "contain added post" in {
+      val post = given(PostAdded(A, Author, Content)).post(A)
+      post must_== Post(A, StreamRevision(1), Author, Content)
+    }
 
-      forAllNoShrink(arbitrary(eventsForSinglePost(A))) { events =>
-        val posts = given.events(events: _*).posts
-        events.filterNot(_.isInstanceOf[PostCommentEvent]).last match {
-          case PostAdded(id, _, content)  => posts.get(id).map(_.content) must beSome(content)
-          case PostEdited(id, content) => posts.get(id).map(_.content) must beSome(content)
-          case PostDeleted(id)         => posts.get(id) must beNone
-          case _                       => failure("unknown event")
-        }
+    "contain edited post" in {
+      val post = given(PostAdded(A, Author, Content), PostEdited(A, Updated)).post(A)
+      post must_== Post(A, StreamRevision(2), Author, Updated)
+    }
+
+    "remove deleted post" in {
+      val posts = given(PostAdded(A, Author, Content), PostDeleted(A)).posts
+      posts.get(A) must beNone
+    }
+
+    "track the stream revision per post" in eventsForMultiplePosts { events =>
+      val fixture = given(events: _*)
+
+      fixture.streamRevisions must haveAllElementsLike {
+        case (postId, revision) => fixture.posts.get(postId).map(_.revision must_== revision).getOrElse(ok)
       }
     }
 
-    "contain all non-deleted posts in reverse order of adding" in {
-      given event PostAdded(A, Author, Content) thenMostRecent 1 must_== Seq(Post(A, StreamRevision(1), Author, Content))
-      given events (PostAdded(A, Author, Content), PostAdded(B, Author, Updated)) thenMostRecent 2 must_== Seq(Post(B, StreamRevision(1), Author, Updated), Post(A, StreamRevision(1), Author, Content))
-      given events (PostAdded(A, Author, Content), PostEdited(A, Updated)) thenMostRecent 1 must_== Seq(Post(A, StreamRevision(2), Author, Updated))
-      given events (PostAdded(A, Author, Content), PostDeleted(A)) thenMostRecent 1 must beEmpty
+    "contain all non-deleted posts in reverse order of adding" in eventsForSinglePost(A) { events =>
+      val posts = given(events: _*).posts
 
-      forAllNoShrink(arbitrary(eventsForMultiplePosts)) { events =>
-        val posts = given.events(events: _*).posts
-        val deletedIds = events.collect { case PostDeleted(id) => id }.toSet
-        val remainingIds = events.collect { case PostAdded(id, _, _) => id }.filterNot(deletedIds)
-
-        posts.mostRecent(Int.MaxValue) must_== remainingIds.flatMap(posts.get).reverse
+      events.filterNot(_.isInstanceOf[PostCommentEvent]).last match {
+        case PostAdded(id, _, content) => posts.get(id).map(_.content) must beSome(content)
+        case PostEdited(id, content)   => posts.get(id).map(_.content) must beSome(content)
+        case PostDeleted(id)           => posts.get(id) must beNone
+        case unknown                   => failure("unknown event: " + unknown)
       }
     }
 
     val CommentContent_1 = CommentContent(Right("Commenter"), "Body 1")
-    "track comments and the next comment id" in {
-      given events (PostAdded(A, Author, Content), CommentAdded(A, CommentId(1), CommentContent_1)) thenPostWithId A must beSome(Post(A, StreamRevision(2), Author, Content, CommentId(2), SortedMap(CommentId(1) -> Comment(CommentId(1), CommentContent_1))))
-      given events (PostAdded(A, Author, Content), CommentAdded(A, CommentId(1), CommentContent_1), CommentDeleted(A, CommentId(1))) thenPostWithId A must beSome(Post(A, StreamRevision(3), Author, Content, CommentId(2), SortedMap.empty))
+    "contain added comment" in {
+      val post = given(PostAdded(A, Author, Content), CommentAdded(A, CommentId(1), CommentContent_1)).post(A)
 
-      forAllNoShrink(arbitrary(eventsForSinglePost(A))) { events =>
-        !events.last.isInstanceOf[PostDeleted] ==> {
-          val post = given.events(events: _*).posts.get(A).getOrElse(failure("post not found"))
-          val commentsAdded = events.collect { case e: CommentAdded => e }
-          val commentsDeleted = events.collect { case e: CommentDeleted => e }.map(_.commentId).toSet
-          val remaining = commentsAdded.filterNot(e => commentsDeleted.contains(e.commentId)).map(e => (e.commentId, Comment(e.commentId, e.content))).toMap
+      post.nextCommentId must_== CommentId(2)
+      post.comments must_== SortedMap(CommentId(1) -> Comment(CommentId(1), CommentContent_1))
+    }
 
-          post.nextCommentId must_== CommentId(commentsAdded.size + 1)
-          remaining must_== post.comments
-        }
+    "remove deleted comment" in {
+      val post = given(
+        PostAdded(A, Author, Content),
+        CommentAdded(A, CommentId(1), CommentContent_1), CommentDeleted(A, CommentId(1))).post(A)
+
+      post.nextCommentId must_== CommentId(2)
+      post.comments must beEmpty
+    }
+
+    "track comments per post" in eventsForSinglePost(A) { events =>
+      !events.last.isInstanceOf[PostDeleted] ==> {
+        val post = given(events: _*).post(A)
+
+        val commentsAdded = events.collect { case e: CommentAdded => e }
+        val commentsDeleted = events.collect { case e: CommentDeleted => e }.map(_.commentId).toSet
+        val remaining = commentsAdded.filterNot(e => commentsDeleted.contains(e.commentId)).map(e => (e.commentId, Comment(e.commentId, e.content))).toMap
+
+        post.nextCommentId must_== CommentId(commentsAdded.size + 1)
+        remaining must_== post.comments
       }
     }
   }
 
-  object given {
-    val password = Password.fromPlainText("password")
+  def given(events: PostEvent*) = new Fixture(events: _*)
 
-    def event(event: PostEvent) = events(event)
-    def events(events: PostEvent*) = new {
-      val posts = {
-        val eventStore = FakeEventStore.fromHistory(events)
-        try {
-          val commits = eventStore.reader.readCommits(StoreRevision.Initial, StoreRevision.Maximum)
-          commits.flatMap(_.eventsWithRevision).foldLeft(Posts())((posts, event) => posts.update(event._1, event._2))
-        } finally {
-          eventStore.close
-        }
-      }
-      def thenPostWithId(id: PostId) = posts.get(id)
-      def thenMostRecent(n: Int) = posts.mostRecent(n)
+  class Fixture(events: PostEvent*) extends eventstore.MemoryImageFixture(events: _*) {
+    val posts = eventsWithRevision.foldLeft(Posts()) {
+      case (posts, (event, revision)) => posts.update(event, revision)
     }
+
+    def post(id: PostId) = posts.get(id).getOrElse(failure("post not found: " + id))
   }
 }

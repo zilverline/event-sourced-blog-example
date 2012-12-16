@@ -11,6 +11,7 @@ object ApplicationBuild extends Build {
     "redis.clients" % "jedis" % "2.1.0",
     "com.yammer.metrics" %% "metrics-scala" % "2.1.2",
     "com.lambdaworks" % "scrypt" % "1.3.3",
+    "org.specs2" %% "specs2" % "1.12.3" % "test",
     "org.scalacheck" %% "scalacheck" % "1.9" % "test")
 
   val main = PlayProject(appName, appVersion, appDependencies, mainLang = SCALA).settings(

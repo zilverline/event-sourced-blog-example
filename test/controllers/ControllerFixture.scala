@@ -11,7 +11,7 @@ object ControllerFixture {
   val password = Password.fromPlainText("password")
 }
 trait ControllerFixture extends After {
-  Play.start(FakeApplication())
+  Play.start(FakeApplication(additionalConfiguration = Map("eventstore.implementation" -> "fake")))
 
   val eventStore: EventStore[DomainEvent] = new fake.FakeEventStore
 

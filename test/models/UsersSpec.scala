@@ -1,10 +1,8 @@
 package models
 
-import org.scalacheck._, Arbitrary.arbitrary, Prop.{ forAll, forAllNoShrink }
-import events._, PostEventsSpec._
+import events._, UserEventsSpec._
 import eventstore._
 import eventstore.fake.FakeEventStore
-import scala.collection.immutable.SortedMap
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class UsersSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
@@ -19,25 +17,22 @@ class UsersSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
     val authenticationToken2 = AuthenticationToken.generate()
 
     "contain registered users" in {
-      val users = given(UserRegistered(A, emailAddress, displayName, password))
-
-      users.get(A) must beSome(RegisteredUser(A, StreamRevision(1), emailAddress, displayName, password))
+      val user = given(UserRegistered(A, emailAddress, displayName, password)).user(A)
+      user must_== RegisteredUser(A, StreamRevision(1), emailAddress, displayName, password)
     }
 
     "store most recent password for user" in {
-      val users = given(UserRegistered(A, emailAddress, displayName, password), UserPasswordChanged(A, password2))
-
-      users.get(A) must beSome(RegisteredUser(A, StreamRevision(2), emailAddress, displayName, password2))
+      val user = given(UserRegistered(A, emailAddress, displayName, password), UserPasswordChanged(A, password2)).user(A)
+      user must_== RegisteredUser(A, StreamRevision(2), emailAddress, displayName, password2)
     }
 
     "track current authentication token when logged in" in {
-      val users = given(UserRegistered(A, emailAddress, displayName, password), UserLoggedIn(A, authenticationToken))
-
+      val users = given(UserRegistered(A, emailAddress, displayName, password), UserLoggedIn(A, authenticationToken)).users
       users.withAuthenticationToken(authenticationToken) must beSome(RegisteredUser(A, StreamRevision(2), emailAddress, displayName, password, Some(authenticationToken)))
     }
 
     "remove current authentication token logged out" in {
-      val users = given(UserRegistered(A, emailAddress, displayName, password), UserLoggedIn(A, authenticationToken), UserLoggedOut(A))
+      val users = given(UserRegistered(A, emailAddress, displayName, password), UserLoggedIn(A, authenticationToken), UserLoggedOut(A)).users
 
       users.withAuthenticationToken(authenticationToken) must beNone
       users.get(A) must beSome(RegisteredUser(A, StreamRevision(3), emailAddress, displayName, password, None))
@@ -47,25 +42,27 @@ class UsersSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
       val users = given(
         UserRegistered(A, emailAddress, displayName, password),
         UserLoggedIn(A, authenticationToken),
-        UserLoggedIn(A, authenticationToken2))
+        UserLoggedIn(A, authenticationToken2)).users
 
       users.withAuthenticationToken(authenticationToken) must beNone
       users.withAuthenticationToken(authenticationToken2) must beSome(RegisteredUser(A, StreamRevision(3), emailAddress, displayName, password, Some(authenticationToken2)))
     }
 
-    "load from history" in forAll(UserEventsSpec.eventsForMultipleUsers.arbitrary) { events =>
-      val users = given(events: _*)
-      users must_== users
+    "track the stream revision per user" in eventsForMultipleUsers { events =>
+      val fixture = given(events: _*)
+      fixture.streamRevisions must haveAllElementsLike {
+        case (userId, revision) => fixture.users.get(userId).map(_.revision must_== revision).getOrElse(ok)
+      }
     }
   }
 
-  def given(events: UserEvent*) = {
-    val eventStore = FakeEventStore.fromHistory(events)
-    try {
-      val commits = eventStore.reader.readCommits(StoreRevision.Initial, StoreRevision.Maximum)
-      commits.flatMap(_.eventsWithRevision).foldLeft(Users())((users, event) => users.update(event._1, event._2))
-    } finally {
-      eventStore.close
+  def given(events: UserEvent*) = new Fixture(events: _*)
+
+  class Fixture(events: UserEvent*) extends eventstore.MemoryImageFixture(events: _*) {
+    val users = eventsWithRevision.foldLeft(Users()) {
+      case (users, (event, revision)) => users.update(event, revision)
     }
+
+    def user(id: UserId) = users.get(id).getOrElse(failure("user not found: " + id))
   }
 }

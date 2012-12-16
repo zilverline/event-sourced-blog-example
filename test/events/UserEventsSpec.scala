@@ -1,7 +1,7 @@
 package events
 
 import eventstore._
-import org.scalacheck._, Arbitrary.arbitrary, Prop.forAll
+import org.scalacheck._, Arbitrary.arbitrary
 import play.api.libs.json._
 import IdentifierSpec._
 import Generators._
@@ -27,29 +27,29 @@ class UserEventsSpec extends org.specs2.mutable.Specification with org.specs2.Sc
       password.hash must_!= "password"
     }
 
-    "convert to and from JSON" in {
+    "convert to and from JSON" in prop { (password: Password) =>
       Json.fromJson[Password](Json.toJson(password)) must_== password
     }
   }
 
   "An authentication token" should {
-    "be equal to itself" in forAll { (id: AuthenticationToken) =>
-      id must_== id
+    "be equal to itself" in prop { (token: AuthenticationToken) =>
+      token must_== token
     }
 
-    "generate unique values" in forAll { (a: AuthenticationToken, b: AuthenticationToken) =>
+    "generate unique values" in prop { (a: AuthenticationToken, b: AuthenticationToken) =>
       a must_!= b
     }
 
-    "convert to and from Strings" in forAll { (id: AuthenticationToken) =>
-      AuthenticationToken.fromString(id.toString) must beSome(id)
+    "convert to and from Strings" in prop { (token: AuthenticationToken) =>
+      AuthenticationToken.fromString(token.toString) must beSome(token)
     }
 
-    "convert to and from JSON" in forAll { (id: AuthenticationToken) =>
-      Json.fromJson[AuthenticationToken](Json.toJson(id)) must_== id
+    "convert to and from JSON" in prop { (token: AuthenticationToken) =>
+      Json.fromJson[AuthenticationToken](Json.toJson(token)) must_== token
     }
 
-    "fail to parse invalid strings" in forAll { (s: String) =>
+    "fail to parse invalid strings" in prop { (s: String) =>
       AuthenticationToken.fromString(s) match {
         case Some(token) => token.toString must_== s
         case None        => ok
@@ -58,7 +58,7 @@ class UserEventsSpec extends org.specs2.mutable.Specification with org.specs2.Sc
   }
 
   "User events" should {
-    "convert to and from JSON" in forAll(eventsForMultipleUsers.arbitrary) { events =>
+    "convert to and from JSON" in eventsForMultipleUsers { events =>
       Json.fromJson[List[UserEvent]](Json.toJson(events)) must_== events
     }
   }
@@ -68,6 +68,8 @@ object UserEventsSpec {
   implicit val arbitraryAuthenticationToken: Arbitrary[AuthenticationToken] = Arbitrary(Gen.wrap(AuthenticationToken.generate()))
   implicit val arbitraryEmailAddress: Arbitrary[EmailAddress] = Arbitrary(Gen.oneOf(Seq("john@example.com", "jane@example.com").map(EmailAddress.apply)))
   implicit val arbitraryPassword: Arbitrary[Password] = Arbitrary(Gen.oneOf(Seq("password", "secret", "12345").map(Password.fromPlainText)))
+
+  implicit val shrinkUserEvents: Shrink[List[UserEvent]] = Shrink(_ => Stream.empty)
 
   private def loginWithOptionalLogout(id: UserId) = for {
     login <- Gen.resultOf(UserLoggedIn(id, _: AuthenticationToken))

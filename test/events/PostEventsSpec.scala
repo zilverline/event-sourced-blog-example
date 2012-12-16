@@ -3,7 +3,7 @@ package events
 import eventstore._
 import java.util.UUID
 import org.joda.time.DateTimeUtils
-import org.scalacheck._, Arbitrary.arbitrary, Prop.forAll
+import org.scalacheck._, Arbitrary.arbitrary
 import play.api.libs.json._
 import IdentifierSpec._
 import Generators._
@@ -13,7 +13,7 @@ class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.Sc
   import PostEventsSpec._
 
   "Post events" should {
-    "convert to and from JSON" in forAll(eventsForMultiplePosts.arbitrary) { events =>
+    "convert to and from JSON" in eventsForMultiplePosts { events =>
       Json.fromJson[List[PostEvent]](Json.toJson(events)) must_== events
     }
 
@@ -56,6 +56,8 @@ class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.Sc
 object PostEventsSpec {
   implicit val arbitraryPostContent: Arbitrary[PostContent] = Arbitrary(Gen.resultOf(PostContent.apply _))
   implicit val arbitraryCommentContent: Arbitrary[CommentContent] = Arbitrary(Gen.resultOf(CommentContent.apply _))
+
+  implicit val shrinkPostEvents: Shrink[List[PostEvent]] = Shrink(_ => Stream.empty)
 
   def eventsForSinglePost(id: PostId): Arbitrary[List[PostEvent]] = Arbitrary(for {
     added <- Gen.resultOf(PostAdded(id, _: UserId, _: PostContent))
