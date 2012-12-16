@@ -13,6 +13,8 @@ object UsersController extends UsersController(Global.MemoryImageActions.view(_.
 class UsersController(actions: ApplicationActions[Users, UserEvent], registerEmailAddress: EmailAddress => UserId) {
   import actions._
 
+  private def unexpectedConflict(conflict: Conflict[UserEvent]) = InternalServerError
+
   object authentication {
     val loginForm = Form(tuple("email" -> emailAddress, "password" -> password))
 
@@ -21,26 +23,25 @@ class UsersController(actions: ApplicationActions[Users, UserEvent], registerEma
     def submit = CommandAction { users => implicit request =>
       val form = loginForm.bindFromRequest
       form.fold(
-        formWithErrors =>
-          abort(BadRequest(views.html.users.logIn(formWithErrors))),
-        credentials =>
-          users.authenticate(credentials._1, credentials._2) map {
-            case (user, token) =>
-              Changes(user.revision, UserLoggedIn(user.id, token): UserEvent).commit(
-                onCommit = Redirect(routes.UsersController.authentication.loggedIn).withSession("authenticationToken" -> token.toString),
-                onConflict = conflict => sys.error("impossible conflict: " + conflict))
-          } getOrElse {
-            abort(BadRequest(views.html.users.logIn(form.addError(FormError("", "bad.credentials")))))
-          })
+        formWithErrors => abort(BadRequest(views.html.users.logIn(formWithErrors))),
+        credentials => users.authenticate(credentials._1, credentials._2) map {
+          case (user, token) =>
+            Changes(user.revision, UserLoggedIn(user.id, token): UserEvent).commit(
+              onCommit = Redirect(routes.UsersController.authentication.loggedIn).withSession("authenticationToken" -> token.toString),
+              onConflict = unexpectedConflict)
+        } getOrElse {
+          abort(BadRequest(views.html.users.logIn(form.addError(FormError("", "bad.credentials")))))
+        })
     }
 
     def logOut = CommandAction { state => implicit request =>
+      def loggedOut = Redirect(routes.UsersController.authentication.loggedOut).withNewSession
       request.currentUser.registered.map { user =>
         Changes(user.revision, UserLoggedOut(user.id): UserEvent).commit(
-          onCommit = Redirect(routes.UsersController.authentication.loggedOut).withNewSession,
-          onConflict = conflict => sys.error("impossible conflict: " + conflict))
+          onCommit = loggedOut,
+          onConflict = unexpectedConflict)
       } getOrElse {
-        abort(Redirect(routes.UsersController.authentication.loggedOut).withNewSession)
+        abort(loggedOut)
       }
     }
 
