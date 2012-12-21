@@ -20,11 +20,13 @@ class MemoryImageActions(memoryImage: MemoryImage[ApplicationState, DomainEvent]
   def CommandAction(block: CommandBlock[AnyContent]) = Action { implicit request =>
     memoryImage.modify { state =>
       val applicationRequest = buildApplicationRequest(state)
+      val currentUser = applicationRequest.currentUser
       val transaction = block(state)(applicationRequest)
-      if (transaction.events.forall(applicationRequest.currentUser.authorizeEvent(state)))
-        transaction
-      else
+      if (transaction.events.forall(currentUser.authorizeEvent(state))) {
+        transaction.withHeaders(currentUser.registered.map(user => "currentUserId" -> user.id.toString).toSeq: _*)
+      } else {
         Transaction.abort(notFound)
+      }
     }
   }
 
