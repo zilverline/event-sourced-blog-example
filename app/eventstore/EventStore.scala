@@ -60,6 +60,9 @@ sealed trait Changes[Event] {
   def expected: StreamRevision
   def events: Seq[Event]
 
+  def headers: Map[String, String]
+  def withHeaders(headers: (String, String)*): Changes[Event]
+
   def withExpectedRevision(expected: StreamRevision): Changes[Event]
 }
 object Changes {
@@ -68,16 +71,17 @@ object Changes {
   def apply[StreamId, Event](expected: StreamRevision, event: Event)(implicit streamType: EventStreamType[StreamId, Event]): Changes[Event] =
     apply(streamType.streamId(event), expected, event)
 }
-private[this] case class EventStreamChanges[A, Event](streamId: A, expected: StreamRevision, events: Seq[Event], eventStreamType: EventStreamType[A, Event]) extends Changes[Event] {
+private[this] case class EventStreamChanges[A, Event](streamId: A, expected: StreamRevision, events: Seq[Event], eventStreamType: EventStreamType[A, Event], headers: Map[String, String] = Map.empty) extends Changes[Event] {
   type StreamId = A
 
+  override def withHeaders(headers: (String, String)*) = copy(headers = this.headers ++ headers)
   override def withExpectedRevision(expected: StreamRevision) = copy(expected = expected)
 }
 
 /**
  * A successful commit to `streamId`.
  */
-case class Commit[+Event](storeRevision: StoreRevision, timestamp: Long, streamId: String, streamRevision: StreamRevision, events: Seq[Event]) {
+case class Commit[+Event](storeRevision: StoreRevision, timestamp: Long, streamId: String, streamRevision: StreamRevision, events: Seq[Event], headers: Map[String, String]) {
   def eventsWithRevision: Seq[(Event, StreamRevision)] = events.map(event => (event, streamRevision))
 
   def withOnlyEventsOfType[E](implicit manifest: Manifest[E]): Commit[E] = copy(events = events.collect {
@@ -89,7 +93,7 @@ case class Commit[+Event](storeRevision: StoreRevision, timestamp: Long, streamI
   }
 }
 object Commit {
-  implicit def CommitFormat[Event: Format]: Format[Commit[Event]] = objectFormat("storeRevision", "timestamp", "streamId", "streamRevision", "events")(apply[Event] _)(unapply)
+  implicit def CommitFormat[Event: Format]: Format[Commit[Event]] = objectFormat("storeRevision", "timestamp", "streamId", "streamRevision", "events", "headers")(apply[Event] _)(unapply)
 }
 
 /**

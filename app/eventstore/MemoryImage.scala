@@ -6,6 +6,9 @@ import scala.concurrent.stm._
  * The transaction to commit to the event when modifying the memory image.
  */
 sealed trait Transaction[+Event, +A] {
+  def headers: Map[String, String]
+  def withHeaders(headers: (String, String)*): Transaction[Event, A]
+
   def events: Seq[Event]
 
   /**
@@ -29,11 +32,15 @@ object Transaction {
       new TransactionCommit(changes, () => onCommit, onConflict, conflictsWith)
   }
 }
-private case class TransactionAbort[A](onAbort: () => A) extends Transaction[Nothing, A] {
+private case class TransactionAbort[A](onAbort: () => A, headers: Map[String, String] = Map.empty) extends Transaction[Nothing, A] {
+  override def withHeaders(headers: (String, String)*) = copy(headers = this.headers ++ headers)
+
   override def events = Seq.empty
   override def map[B](f: A => B): Transaction[Nothing, B] = TransactionAbort(() => f(onAbort()))
 }
 private case class TransactionCommit[Event, A](changes: Changes[Event], onCommit: () => A, onConflict: Conflict[Event] => A, conflictsWith: ConflictsWith[Event]) extends Transaction[Event, A] {
+  override def headers = changes.headers
+  override def withHeaders(headers: (String, String)*) = copy(changes = changes.withHeaders(headers: _*))
   override def events = changes.events
   override def map[B](f: A => B): Transaction[Event, B] =
     TransactionCommit[Event, B](changes, () => f(onCommit()), conflict => f(onConflict(conflict)), conflictsWith)
@@ -70,7 +77,7 @@ class MemoryImage[State, -Event: Manifest] private (eventStore: EventStore[Event
     @annotation.tailrec def runTransaction(minimum: StoreRevision): A = {
       val (state, transactionRevision) = getWithRevisionAt(minimum)
       body(state) match {
-        case TransactionAbort(onAbort) =>
+        case TransactionAbort(onAbort, _) =>
           onAbort()
         case TransactionCommit(changes, onCommit, onConflict, conflictsWith) =>
           eventStore.committer.tryCommit(changes) match {

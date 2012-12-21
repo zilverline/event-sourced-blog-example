@@ -30,7 +30,7 @@ trait RedisWatchMultiExecEventCommitter[Event] { this: RedisEventStore[Event] =>
           if (changes.expected != actual) {
             abortCommit(streamId, actual, changes.expected)
           } else {
-            val commit = Commit(storeRevision.next, DateTimeUtils.currentTimeMillis, streamId, actual.next, changes.events)
+            val commit = Commit(storeRevision.next, DateTimeUtils.currentTimeMillis, streamId, actual.next, changes.events, changes.headers)
             if (doCommit(streamKey, commit)) {
               Right(commit)
             } else {

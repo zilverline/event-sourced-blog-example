@@ -60,7 +60,7 @@ class FakeEventStore[Event] extends EventStore[Event] {
         } else if (changes.expected > actual) {
           throw new IllegalArgumentException("expected revision %d greater than actual revision %d" format (changes.expected.value, actual.value))
         } else {
-          val commit = Commit(storeRevision.next, DateTimeUtils.currentTimeMillis, streamId, actual.next, changes.events)
+          val commit = Commit(storeRevision.next, DateTimeUtils.currentTimeMillis, streamId, actual.next, changes.events, changes.headers)
           commits.transform(_ :+ commit)
           streams.transform(streams => streams.updated(changes.streamId, streams.getOrElse(changes.streamId, Vector.empty) :+ commit))
           Right(commit)

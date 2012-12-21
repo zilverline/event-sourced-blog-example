@@ -105,8 +105,8 @@ class StreamRevisionSpec extends org.specs2.mutable.Specification with org.specs
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class CommitSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
-  val SerializedCommit = """{"storeRevision":5,"timestamp":1342542931694,"streamId":"StreamId","streamRevision":2,"events":["Event1","Event2"]}"""
-  val ExampleCommit = Commit(StoreRevision(5), 1342542931694L, "StreamId", StreamRevision(2), Seq("Event1", "Event2"))
+  val SerializedCommit = """{"storeRevision":5,"timestamp":1342542931694,"streamId":"StreamId","streamRevision":2,"events":["Event1","Event2"],"headers":{"header":"value"}}"""
+  val ExampleCommit = Commit(StoreRevision(5), 1342542931694L, "StreamId", StreamRevision(2), Seq("Event1", "Event2"), Map("header" -> "value"))
 
   "Commits" should {
     "deserialize example JSON" in {
@@ -145,7 +145,7 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
       val result = subject.committer.tryCommit(Changes(id, StreamRevision.Initial, event))
 
       result must beRight
-      result.right.get must matchCommit(Commit(StoreRevision(1), now, id, StreamRevision(1), Seq(event)))
+      result.right.get must matchCommit(Commit(StoreRevision(1), now, id, StreamRevision(1), Seq(event), Map.empty))
 
       subject.reader.storeRevision must_== StoreRevision.Initial.next
     }
@@ -166,12 +166,12 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
     }
 
     "store commits" in new fixture {
-      subject.committer.tryCommit(Changes("streamId", StreamRevision(0), "event"))
+      subject.committer.tryCommit(Changes("streamId", StreamRevision(0), "event").withHeaders("header" -> "value"))
 
       subject.reader.streamRevision("streamId") must_== StreamRevision(1)
       val commits = subject.reader.readStream("streamId")
       commits must have size(1)
-      commits(0) must matchCommit(Commit(StoreRevision(1), now, "streamId", StreamRevision(1), Seq("event")))
+      commits(0) must matchCommit(Commit(StoreRevision(1), now, "streamId", StreamRevision(1), Seq("event"), Map("header" -> "value")))
     }
 
     "store commits in multiple streams" in new fixture {

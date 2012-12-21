@@ -17,6 +17,7 @@ trait RedisLuaEventCommitter[Event] { this: RedisEventStore[Event] =>
     | local streamId = ARGV[2]
     | local expected = tonumber(ARGV[3])
     | local events = ARGV[4]
+    | local headers = ARGV[5]
     |
     | local actual = tonumber(redis.call('llen', streamKey))
     | if actual ~= expected then
@@ -25,8 +26,8 @@ trait RedisLuaEventCommitter[Event] { this: RedisEventStore[Event] =>
     |
     | local storeRevision = tonumber(redis.call('hlen', commitsKey))
     | local commitId = storeRevision + 1
-    | local commitData = string.format('{"storeRevision":%d,"timestamp":%d,"streamId":%s,"streamRevision":%d,"events":%s}',
-    |   commitId, timestamp, cjson.encode(streamId), actual + 1, events)
+    | local commitData = string.format('{"storeRevision":%d,"timestamp":%d,"streamId":%s,"streamRevision":%d,"events":%s,"headers":%s}',
+    |   commitId, timestamp, cjson.encode(streamId), actual + 1, events, headers)
     |
     | redis.call('hset', commitsKey, commitId, commitData)
     | redis.call('rpush', streamKey, commitId)
@@ -43,10 +44,11 @@ trait RedisLuaEventCommitter[Event] { this: RedisEventStore[Event] =>
       implicit val descriptor = changes.eventStreamType
       val timestamp = DateTimeUtils.currentTimeMillis
       val serializedEvents = Json.stringify(Json.toJson(changes.events: Seq[Event])(Writes.seqWrites(eventFormat)))
+      val serializedHeaders = Json.stringify(Json.toJson(changes.headers))
       val streamId = descriptor.toString(changes.streamId)
       val response = withJedis { _.evalsha(TryCommitScriptId, 2,
         /* KEYS */ CommitsKey, keyForStream(streamId),
-        /* ARGV */ timestamp.toString, streamId, changes.expected.value.toString, serializedEvents)
+        /* ARGV */ timestamp.toString, streamId, changes.expected.value.toString, serializedEvents, serializedHeaders)
       }
 
       try {
@@ -55,7 +57,7 @@ trait RedisLuaEventCommitter[Event] { this: RedisEventStore[Event] =>
             val conflicting = reader.readStream(changes.streamId, since = changes.expected)
             Left(Conflict(conflicting.flatMap(_.committedEvents)))
           case Seq("commit", storeRevision: String) =>
-            Right(Commit(StoreRevision(storeRevision.toLong), timestamp, streamId, changes.expected.next, changes.events))
+            Right(Commit(StoreRevision(storeRevision.toLong), timestamp, streamId, changes.expected.next, changes.events, changes.headers))
         }
       } catch {
         case e: Exception =>

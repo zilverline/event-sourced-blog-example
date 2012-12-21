@@ -137,4 +137,15 @@ object JsonMapping {
       JsObject(Seq(a -> toJson(unapplied._1), b -> toJson(unapplied._2), c -> toJson(unapplied._3), d -> toJson(unapplied._4), e -> toJson(unapplied._5)))
     }
   }
+
+  /**
+   * Maps an instance to a JSON object with a fields named `a`, `b`, `c`, `d`, `e`, and 'f' using the provided `apply` and `unapply` functions.
+   */
+  def objectFormat[R, A: Format, B: Format, C: Format, D: Format, E: Format, F: Format](a: String, b: String, c: String, d: String, e: String, f: String)(apply: (A, B, C, D, E, F) => R)(unapply: R => Option[(A, B, C, D, E, F)]): Format[R] = new Format[R] {
+      override def reads(json: JsValue) = apply((json \ a).as[A], (json \ b).as[B], (json \ c).as[C], (json \ d).as[D], (json \ e).as[E], (json \ f).as[F])
+              override def writes(o: R) = {
+          val unapplied = extract(o, unapply)
+                  JsObject(Seq(a -> toJson(unapplied._1), b -> toJson(unapplied._2), c -> toJson(unapplied._3), d -> toJson(unapplied._4), e -> toJson(unapplied._5), f -> toJson(unapplied._6)))
+      }
+  }
 }
