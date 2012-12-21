@@ -1,4 +1,4 @@
-@(id: PostId, form: Form[PostContent])(implicit request: ApplicationRequestHeader)
+@(id: PostId, form: Form[PostContent])(implicit context: CurrentUserContext with FlashContext)
 
 @main("New blog post") {
   @postContentForm(label = "Add", action = routes.PostsController.add.submit(id), form = form)

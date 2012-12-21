@@ -1,6 +1,6 @@
-@()(implicit request: RequestHeader)
+@()(implicit context: FlashContext)
 
-@info = @{ request.flash.get("info") }
+@info = @{ context.flash.get("info") }
 
 @info match {
   case Some(message) => {

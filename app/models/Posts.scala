@@ -15,12 +15,12 @@ case class Post(
     nextCommentId: CommentId = CommentId(1),
     comments: SortedMap[CommentId, Comment] = SortedMap.empty) {
 
-  def author(implicit context: UserContext): User = context.users.get(authorId) getOrElse UnknownUser(authorId)
+  def author(implicit context: UsersContext): User = context.users.get(authorId) getOrElse UnknownUser(authorId)
   def isAuthoredBy(user: RegisteredUser) = authorId == user.id
 }
 
 case class Comment(id: CommentId, content: CommentContent) {
-  def commenter(implicit context: UserContext): User =
+  def commenter(implicit context: UsersContext): User =
     content.commenter.fold(
       userId => context.users.get(userId) getOrElse UnknownUser(userId),
       PseudonymousUser)

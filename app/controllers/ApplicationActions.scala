@@ -6,17 +6,16 @@ import models._
 import play.api.mvc._
 import play.api.mvc.Results._
 
-/**
- * Extend Play's `Request` with user information.
- */
-trait ApplicationRequestHeader extends RequestHeader with UserContext {
-  /**
-   * The current authenticated user or the guest user.
-   */
-  def currentUser: User
+trait FlashContext {
+  def flash: Flash
 }
+
+/**
+ * Extend Play's `Request` with user context information.
+ */
+trait ApplicationRequestHeader extends RequestHeader with CurrentUserContext with UsersContext with FlashContext
 class ApplicationRequest[A](val currentUser: User, val users: Users, request: Request[A])
-    extends WrappedRequest(request) with ApplicationRequestHeader
+  extends WrappedRequest(request) with ApplicationRequestHeader
 
 /**
  * Actions available to a controller that makes use of a memory image.

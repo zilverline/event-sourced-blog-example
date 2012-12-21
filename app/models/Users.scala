@@ -3,7 +3,13 @@ package models
 import events._
 import eventstore._
 
-trait UserContext {
+trait CurrentUserContext {
+  /**
+   * The current authenticated user or the guest user.
+   */
+  def currentUser: User
+}
+trait UsersContext {
   def users: Users
 }
 
