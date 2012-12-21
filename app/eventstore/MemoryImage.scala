@@ -28,17 +28,6 @@ object Transaction {
     def commit[A](onCommit: => A, onConflict: Conflict[Event] => A)(implicit conflictsWith: ConflictsWith[Event]): Transaction[Event, A] =
       new TransactionCommit(changes, () => onCommit, onConflict, conflictsWith)
   }
-
-  implicit def OptionTransactionOps[Event, A](m: Option[Transaction[Event, A]]) = new OptionTransactionOps(m)
-  class OptionTransactionOps[Event, A](value: Option[Transaction[Event, A]]) {
-    /**
-     * Turns an `Option[Transaction[Event, A]]` into `Transaction[Event, Option[A]]`.
-     */
-    def sequence: Transaction[Event, Option[A]] = value match {
-      case None              => abort(None)
-      case Some(transaction) => transaction.map(Some(_))
-    }
-  }
 }
 private case class TransactionAbort[A](onAbort: () => A) extends Transaction[Nothing, A] {
   override def events = Seq.empty
