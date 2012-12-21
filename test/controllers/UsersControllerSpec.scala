@@ -5,10 +5,6 @@ import play.api.test.Helpers._
 import events._
 import eventstore._
 import models._
-import org.specs2.mutable.After
-import scala.collection.immutable.SortedMap
-import eventstore.EventStreamType
-import play.api.Play
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class UsersControllerSpec extends org.specs2.mutable.Specification {
@@ -26,7 +22,7 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
       val response = subject.register.submit(request)
 
       status(response) must_== 303
-      changes must have size(1)
+      changes must have size 1
       changes(0) must beAnInstanceOf[UserRegistered]
 
       val event = changes(0).asInstanceOf[UserRegistered]
@@ -47,20 +43,48 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
 
     "allow logged in users to log out" in new fixture {
       given(
-          UserRegistered(userId, email, displayName, password): UserEvent,
-          UserLoggedIn(userId, authenticationToken): UserEvent)
+        UserRegistered(userId, email, displayName, password): UserEvent,
+        UserLoggedIn(userId, authenticationToken): UserEvent)
 
-      val response = subject.authentication.logOut(FakeRequest().withSession("authenticationToken" -> authenticationToken.toString))
+      val response = subject.authentication.logOut(authenticated)
 
       status(response) must_== 303
       session(response) must beEmpty
       changes must_== Seq(UserLoggedOut(userId))
+    }
+
+    "allow editing the user's profile" in new fixture {
+      given(
+        UserRegistered(userId, email, displayName, password): UserEvent,
+        UserLoggedIn(userId, authenticationToken): UserEvent)
+
+      val response = subject.profile.changeProfile(authenticated.withFormUrlEncodedBody("displayName" -> "Updated"))
+
+      status(response) must_== 303
+      changes must_== Seq(UserProfileChanged(userId, displayName = "Updated"))
+    }
+
+    "allow changing the user's email" in new fixture {
+      val updated = EmailAddress("updated@example.com")
+      given(
+        UserRegistered(userId, email, displayName, password): UserEvent,
+        UserLoggedIn(userId, authenticationToken): UserEvent)
+
+      val response = subject.profile.changeEmailAddress(authenticated.withFormUrlEncodedBody("email" -> updated.value))
+
+      status(response) must_== 303
+      changes must_== Seq(UserEmailAddressChanged(userId, EmailAddress("updated@example.com")))
+      claimedUserIds must havePair(updated -> userId)
     }
   }
 
   trait fixture extends ControllerFixture {
     val claimedUserIds = collection.mutable.Map.empty[EmailAddress, UserId]
 
-    val subject = new UsersController(new MemoryImageActions(memoryImage).view(_.users), email => claimedUserIds.getOrElseUpdate(email, UserId.generate()))
+    val authenticated = FakeRequest().withSession("authenticationToken" -> authenticationToken.toString)
+
+    val subject = new UsersController(
+      new MemoryImageActions(memoryImage).view(_.users),
+      (email, userId) => claimedUserIds.getOrElseUpdate(email, userId))
   }
 }

@@ -27,6 +27,10 @@ POST    /users/register             controllers.UsersController.register.submit
 GET     /users/registered           controllers.UsersController.register.registered
 GET     /users/logged-in            controllers.UsersController.authentication.loggedIn
 GET     /users/log-out              controllers.UsersController.authentication.logOut
+GET     /profile                    controllers.UsersController.profile.show
+POST    /profile                    controllers.UsersController.profile.changeProfile
+POST    /profile/email              controllers.UsersController.profile.changeEmailAddress
+POST    /profile/password           controllers.UsersController.profile.changePassword
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)

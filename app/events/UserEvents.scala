@@ -75,6 +75,8 @@ sealed trait UserEvent extends DomainEvent {
   def userId: UserId
 }
 case class UserRegistered(userId: UserId, email: EmailAddress, displayName: String, password: Password) extends UserEvent
+case class UserProfileChanged(userId: UserId, displayName: String) extends UserEvent
+case class UserEmailAddressChanged(userId: UserId, email: EmailAddress) extends UserEvent
 case class UserPasswordChanged(userId: UserId, password: Password) extends UserEvent
 case class UserLoggedIn(userId: UserId, token: AuthenticationToken) extends UserEvent
 case class UserLoggedOut(userId: UserId) extends UserEvent
@@ -88,6 +90,8 @@ object UserEvent {
 
   implicit val UserEventFormat: TypeChoiceFormat[UserEvent] = TypeChoiceFormat(
     "UserRegistered" -> objectFormat("userId", "email", "displayName", "password")(UserRegistered.apply)(UserRegistered.unapply),
+    "UserProfileChanged" -> objectFormat("userId", "displayName")(UserProfileChanged.apply)(UserProfileChanged.unapply),
+    "UserEmailAddressChanged" -> objectFormat("userId", "email")(UserEmailAddressChanged.apply)(UserEmailAddressChanged.unapply),
     "UserPasswordChanged" -> objectFormat("userId", "password")(UserPasswordChanged.apply)(UserPasswordChanged.unapply),
     "UserLoggedIn" -> objectFormat("userId", "authenticationToken")(UserLoggedIn.apply)(UserLoggedIn.unapply),
     "UserLoggedOut" -> objectFormat("userId")(UserLoggedOut.apply)(UserLoggedOut.unapply))

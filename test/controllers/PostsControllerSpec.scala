@@ -5,9 +5,7 @@ import play.api.test.Helpers._
 import events._
 import eventstore._
 import models._
-import org.specs2.mutable.After
 import scala.collection.immutable.SortedMap
-import play.api.Play
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class PostsControllerSpec extends org.specs2.mutable.Specification {

@@ -1,0 +1,44 @@
+@(profileForm: Form[String], emailForm: Form[EmailAddress], passwordForm: Form[(String, Password)])(implicit context: CurrentUserContext with FlashContext)
+@import views.support._
+
+@main("Your profile") {
+  <h2>Profile</h2>
+
+  @helper.form(action = routes.UsersController.profile.changeProfile) {
+    @globalErrorsPanel(profileForm)
+    <fieldset>
+      @helper.inputText(profileForm("displayName"), '_label -> Messages("displayName"), 'autofocus -> 'autofocus, 'required -> "required")
+    </fieldset>
+
+    <fieldset>
+      <button class="btn btn-primary">Update</button>
+    </fieldset>
+  }
+
+  <h2>Email</h2>
+
+  @helper.form(action = routes.UsersController.profile.changeEmailAddress) {
+    @globalErrorsPanel(emailForm)
+    <fieldset>
+      @helper.inputText(emailForm("email"), '_label -> Messages("email"), 'required -> "required")
+    </fieldset>
+
+    <fieldset>
+      <button class="btn btn-primary">Update</button>
+    </fieldset>
+  }
+
+  <h2>Password</h2>
+  @helper.form(action = routes.UsersController.profile.changePassword) {
+    @globalErrorsPanel(passwordForm)
+    <fieldset>
+      @helper.inputPassword(passwordForm("password.old"), '_label -> Messages("password.old"), 'required -> "required")
+      @helper.inputPassword(passwordForm("password.new")("1"), '_label -> Messages("password.new.1"), 'required -> "required")
+      @helper.inputPassword(passwordForm("password.new")("2"), '_label -> Messages("password.new.2"), 'required -> "required")
+    </fieldset>
+
+    <fieldset>
+      <button class="btn btn-primary">Change</button>
+    </fieldset>
+  }
+}

@@ -21,9 +21,26 @@ class UsersSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
       user must_== RegisteredUser(A, StreamRevision(1), emailAddress, displayName, password)
     }
 
-    "store most recent password for user" in {
+    "store current profile for user" in {
+      val user = given(UserRegistered(A, emailAddress, displayName, password), UserProfileChanged(A, "Updated")).user(A)
+      user must_== RegisteredUser(A, StreamRevision(2), emailAddress, "Updated", password)
+    }
+
+    "store current password for user" in {
       val user = given(UserRegistered(A, emailAddress, displayName, password), UserPasswordChanged(A, password2)).user(A)
       user must_== RegisteredUser(A, StreamRevision(2), emailAddress, displayName, password2)
+    }
+
+    "track users by initial email address" in {
+      val users = given(UserRegistered(A, emailAddress, displayName, password)).users
+      users.withEmail(emailAddress) must beSome(RegisteredUser(A, StreamRevision(1), emailAddress, displayName, password))
+    }
+
+    "track users by changed email address" in {
+      val updated = EmailAddress("updated@example.com")
+      val users = given(UserRegistered(A, emailAddress, displayName, password), UserEmailAddressChanged(A, updated)).users
+      users.withEmail(emailAddress) must beNone
+      users.withEmail(updated) must beSome(RegisteredUser(A, StreamRevision(2), updated, displayName, password))
     }
 
     "track current authentication token when logged in" in {

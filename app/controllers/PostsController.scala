@@ -7,6 +7,7 @@ import models._
 import play.api.data._
 import play.api.data.Forms._
 import play.api.data.validation.Constraints._
+import play.api.i18n.Messages
 import support.Forms._
 
 object PostsController extends PostsController(Global.MemoryImageActions.view(_.posts))
@@ -57,7 +58,7 @@ class PostsController(actions: ApplicationActions[Posts, PostEvent]) {
             abort(BadRequest(views.html.posts.add(id, formWithErrors))),
           postContent =>
             Changes(StreamRevision.Initial, PostAdded(id, user.id, postContent): PostEvent).commit(
-              onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post added."),
+              onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> Messages("post.added")),
               onConflict = conflict => Conflict(views.html.posts.edit(id, conflict.actual, postContentForm.fill(postContent), conflict.events))))
       } else {
         abort(notFound)
@@ -84,7 +85,7 @@ class PostsController(actions: ApplicationActions[Posts, PostEvent]) {
             abort(BadRequest(views.html.posts.edit(id, expected, formWithErrors))),
           postContent =>
             Changes(expected, PostEdited(id, postContent): PostEvent).commit(
-              onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post saved."),
+              onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> Messages("post.edited")),
               onConflict = conflict => Conflict(views.html.posts.edit(id, conflict.actual, postContentForm.fill(postContent), conflict.events))))
       } getOrElse {
         abort(notFound)
@@ -98,7 +99,7 @@ class PostsController(actions: ApplicationActions[Posts, PostEvent]) {
   def delete(id: PostId, expected: StreamRevision) = AuthenticatedCommandAction { user => posts => implicit request =>
     posts.get(id).filter(user.canDeletePost) map { post =>
       Changes(expected, PostDeleted(id): PostEvent).commit(
-        onCommit = Redirect(routes.PostsController.index).flashing("info" -> "Post deleted."),
+        onCommit = Redirect(routes.PostsController.index).flashing("info" -> Messages("post.deleted")),
         onConflict = conflict => Conflict(views.html.posts.index(posts.mostRecent(20), conflict.events)))
     } getOrElse {
       abort(notFound)
@@ -132,7 +133,7 @@ class PostsController(actions: ApplicationActions[Posts, PostEvent]) {
             abort(BadRequest(views.html.posts.show(post, formWithErrors))),
           commentContent =>
             Changes(expected, CommentAdded(postId, post.nextCommentId, commentContent): PostEvent).commit(
-              onCommit = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment added."),
+              onCommit = Redirect(routes.PostsController.show(postId)).flashing("info" -> Messages("comment.added")),
               onConflict = conflict => Conflict(views.html.posts.show(post, commentContentForm.fill(commentContent), conflict.events))))
       } getOrElse {
         abort(notFound)
@@ -146,7 +147,7 @@ class PostsController(actions: ApplicationActions[Posts, PostEvent]) {
         if user.canDeleteComment(post, comment)
       } yield {
         Changes(expected, CommentDeleted(postId, commentId): PostEvent).commit(
-          onCommit = Redirect(routes.PostsController.show(postId)).flashing("info" -> "Comment deleted."),
+          onCommit = Redirect(routes.PostsController.show(postId)).flashing("info" -> Messages("comment.deleted")),
           onConflict = conflict => Conflict(views.html.posts.show(post, commentContentForm, conflict.events)))
       }).getOrElse {
         abort(notFound)

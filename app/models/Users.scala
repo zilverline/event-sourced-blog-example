@@ -67,7 +67,7 @@ case object GuestUser extends User {
  */
 case class RegisteredUser(id: UserId,
                           revision: StreamRevision,
-                          emailAddress: EmailAddress,
+                          email: EmailAddress,
                           displayName: String,
                           password: Password,
                           authenticationToken: Option[AuthenticationToken] = None)
@@ -82,14 +82,16 @@ case class RegisteredUser(id: UserId,
   override def canDeleteComment(post: Post, comment: Comment) = post.isAuthoredBy(this) || comment.isAuthoredBy(this)
 
   override def authorizeEvent(state: ApplicationState): DomainEvent => Boolean = {
-    case event: UserRegistered      => false
-    case event: UserPasswordChanged => id == event.userId
-    case event: UserLoggedIn        => true
-    case event: UserLoggedOut       => id == event.userId
-    case event: PostAdded           => id == event.authorId
-    case event: PostEdited          => state.posts.get(event.postId).exists(canEditPost)
-    case event: PostDeleted         => state.posts.get(event.postId).exists(canDeletePost)
-    case event: CommentAdded        => state.posts.get(event.postId).exists(canAddComment)
+    case event: UserRegistered          => false
+    case event: UserProfileChanged      => true
+    case event: UserEmailAddressChanged => true
+    case event: UserPasswordChanged     => id == event.userId
+    case event: UserLoggedIn            => true
+    case event: UserLoggedOut           => id == event.userId
+    case event: PostAdded               => id == event.authorId
+    case event: PostEdited              => state.posts.get(event.postId).exists(canEditPost)
+    case event: PostDeleted             => state.posts.get(event.postId).exists(canDeletePost)
+    case event: CommentAdded            => state.posts.get(event.postId).exists(canAddComment)
     case event: CommentDeleted =>
       (for {
         post <- state.posts.get(event.postId)
@@ -126,6 +128,15 @@ case class Users(
     case UserRegistered(userId, email, displayName, password) =>
       val user = RegisteredUser(userId, revision, email, displayName, password)
       copy(byId = byId.updated(userId, user), byEmail = byEmail.updated(email, userId))
+
+    case UserProfileChanged(userId, displayName) =>
+      val user = byId(userId)
+      copy(byId = byId.updated(userId, user.copy(revision = revision, displayName = displayName)))
+
+    case UserEmailAddressChanged(userId, email) =>
+      val user = byId(userId)
+      copy(byId = byId.updated(userId, user.copy(revision = revision, email = email)),
+           byEmail = byEmail - user.email + (email -> userId))
 
     case UserPasswordChanged(userId, password) =>
       val user = byId(userId)

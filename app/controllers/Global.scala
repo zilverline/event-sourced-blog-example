@@ -38,7 +38,7 @@ object Global extends GlobalSettings {
     }
   }
 
-  lazy val emailAddressRegistry: EmailAddress => UserId = {
+  lazy val emailAddressRegistry: RedisEmailRegistry = {
     val config = Play.configuration.getConfig("email-registry").getOrElse(throw Play.configuration.globalError("missing [email-registry] configuration"))
 
     val redisHost = config.getString("redis.host").getOrElse(throw config.globalError("missing key [email-registry.redis.host]"))
@@ -47,7 +47,7 @@ object Global extends GlobalSettings {
 
     val jedis = new Jedis(redisHost, redisPort)
 
-    RedisEmailRegistry.claim(jedis, redisKey)
+    new RedisEmailRegistry(jedis, redisKey)
   }
 
   object MemoryImageActions extends MemoryImageActions(persistence.memoryImage)

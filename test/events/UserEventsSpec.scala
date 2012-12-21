@@ -78,9 +78,11 @@ object UserEventsSpec {
 
   def eventsForSingleUser(id: UserId): Arbitrary[List[UserEvent]] = Arbitrary(for {
     registered <- Gen.resultOf(UserRegistered(id, _: EmailAddress, _: String, _: Password))
+    profileChanges <- Gen.resize(2, Gen.listOf(Gen.resultOf(UserProfileChanged(id, _: String))))
+    emailChanges <- Gen.resize(2, Gen.listOf(Gen.resultOf(UserEmailAddressChanged(id, _: EmailAddress))))
     passwordChanges <- Gen.resize(2, Gen.listOf(Gen.resultOf(UserPasswordChanged(id, _: Password))))
     logins <- Gen.resize(5, Gen.listOf(loginWithOptionalLogout(id)).map(_.flatten))
-    events <- interleaved(passwordChanges, logins)
+    events <- interleaved(profileChanges, emailChanges, passwordChanges, logins)
   } yield registered :: events)
 
   val eventsForMultipleUsers: Arbitrary[List[UserEvent]] = Arbitrary(for {
