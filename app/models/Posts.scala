@@ -7,13 +7,12 @@ import scala.collection.immutable.SortedMap
 /**
  * A specific blog post with its current revision and content.
  */
-case class Post(
-    id: PostId,
-    revision: StreamRevision,
-    authorId: UserId,
-    content: PostContent,
-    nextCommentId: CommentId = CommentId(1),
-    comments: SortedMap[CommentId, Comment] = SortedMap.empty) {
+case class Post(id: PostId,
+                revision: StreamRevision,
+                authorId: UserId,
+                content: PostContent,
+                nextCommentId: CommentId = CommentId(1),
+                comments: SortedMap[CommentId, Comment] = SortedMap.empty) {
 
   def author(implicit context: UsersContext): User = context.users.get(authorId) getOrElse UnknownUser(authorId)
   def isAuthoredBy(user: RegisteredUser) = authorId == user.id
@@ -31,9 +30,8 @@ case class Comment(id: CommentId, content: CommentContent) {
 /**
  * The current state of blog posts, derived from all committed PostEvents.
  */
-case class Posts(
-    private val byId: Map[PostId, Post] = Map.empty,
-    private val orderedByTimeAdded: Seq[PostId] = Vector.empty) {
+case class Posts(private val byId: Map[PostId, Post] = Map.empty,
+                 private val orderedByTimeAdded: Seq[PostId] = Vector.empty) {
 
   def get(id: PostId): Option[Post] = byId.get(id)
   def mostRecent(n: Int): Seq[Post] = orderedByTimeAdded.takeRight(n).reverse.flatMap(get)

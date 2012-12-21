@@ -10,8 +10,7 @@ case class ApplicationState(posts: Posts = Posts(), users: Users = Users()) {
     case _                => sys.error("unknown event: " + event)
   }
 
-  def updateMany(events: Seq[(DomainEvent, StreamRevision)]): ApplicationState = events.foldLeft(this) { (state, change) =>
-    val (event, streamRevision) = change
-    state.update(event, streamRevision)
+  def updateMany(events: Seq[(DomainEvent, StreamRevision)]): ApplicationState = events.foldLeft(this) {
+    case (state, (event, streamRevision)) => state.update(event, streamRevision)
   }
 }

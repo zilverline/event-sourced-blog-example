@@ -10,15 +10,22 @@ trait CurrentUserContext {
   def currentUser: User
 }
 trait UsersContext {
+  /**
+   * All known users and sessions.
+   */
   def users: Users
 }
 
+/**
+ * Interface common to all kinds of users.
+ */
 sealed trait User {
   def displayName: String
 
   def registered: Option[RegisteredUser] = None
 
   def canAddPost: Boolean = false
+  def canAddComment(post: Post): Boolean = false
   def canEditPost(post: Post): Boolean = false
   def canDeletePost(post: Post): Boolean = false
   def canDeleteComment(post: Post, comment: Comment): Boolean = false
@@ -26,27 +33,50 @@ sealed trait User {
   def authorizeEvent(state: ApplicationState): DomainEvent => Boolean = _ => false
 }
 
+/**
+ * A deleted or non-existent user.
+ */
+case class UnknownUser(id: UserId) extends User {
+  def displayName = "[deleted]"
+}
+
+/**
+ * A user that we know the name of, but nothing else. Consider a comment posted
+ * by a guest (where they have to specify the name).
+ */
+case class PseudonymousUser(displayName: String) extends User
+
+/**
+ * A visitor to the site is represented by the guest user.
+ */
 case object GuestUser extends User {
   def displayName = "Guest"
 
+  override def canAddComment(post: Post) = true
+
   override def authorizeEvent(state: ApplicationState): DomainEvent => Boolean = {
-    case _: UserRegistered => true
-    case _: UserLoggedIn   => true
-    case _: CommentAdded   => true
-    case _                 => false
+    case event: UserRegistered => true
+    case event: UserLoggedIn   => true
+    case event: CommentAdded   => state.posts.get(event.postId).exists(canAddComment)
+    case _                     => false
   }
 }
 
-case class PseudonymousUser(displayName: String) extends User
+/**
+ * A registered user that is optionally authenticated with an `authenticationToken`.
+ */
+case class RegisteredUser(id: UserId,
+                          revision: StreamRevision,
+                          emailAddress: EmailAddress,
+                          displayName: String,
+                          password: Password,
+                          authenticationToken: Option[AuthenticationToken] = None)
+    extends User {
 
-case class UnknownUser(id: UserId) extends User {
-  def displayName = "[unknown]"
-}
-
-case class RegisteredUser(id: UserId, revision: StreamRevision, emailAddress: EmailAddress, displayName: String, password: Password, authenticationToken: Option[AuthenticationToken] = None) extends User {
   override def registered = Some(this)
 
   override def canAddPost = true
+  override def canAddComment(post: Post) = true
   override def canEditPost(post: Post) = post.isAuthoredBy(this)
   override def canDeletePost(post: Post) = post.isAuthoredBy(this)
   override def canDeleteComment(post: Post, comment: Comment) = post.isAuthoredBy(this) || comment.isAuthoredBy(this)
@@ -57,9 +87,9 @@ case class RegisteredUser(id: UserId, revision: StreamRevision, emailAddress: Em
     case event: UserLoggedIn        => true
     case event: UserLoggedOut       => id == event.userId
     case event: PostAdded           => id == event.authorId
-    case event: PostEdited          => state.posts.get(event.postId).exists(this canEditPost _)
-    case event: PostDeleted         => state.posts.get(event.postId).exists(this canDeletePost _)
-    case event: CommentAdded        => true
+    case event: PostEdited          => state.posts.get(event.postId).exists(canEditPost)
+    case event: PostDeleted         => state.posts.get(event.postId).exists(canDeletePost)
+    case event: CommentAdded        => state.posts.get(event.postId).exists(canAddComment)
     case event: CommentDeleted =>
       (for {
         post <- state.posts.get(event.postId)
@@ -73,6 +103,9 @@ case class RegisteredUser(id: UserId, revision: StreamRevision, emailAddress: Em
   }
 }
 
+/**
+ * Memory image of all registered users based on (replaying) the user events.
+ */
 case class Users(
     private val byId: Map[UserId, RegisteredUser] = Map.empty,
     private val byEmail: Map[EmailAddress, UserId] = Map.empty,

@@ -101,19 +101,24 @@ class PostsController(actions: ApplicationActions[Posts, PostEvent]) {
    * Add and delete comments.
    */
   object comments {
-    def commentContentForm(implicit request: ApplicationRequestHeader): Form[CommentContent] = Form(
-      request.currentUser.registered.map { user =>
+    /**
+     * The form depends on the current user. If the current user is registered
+     * the name is fixed and the comment will be associated to the user. Guest
+     * users can fill in any name and will be treated as pseudonymous users.
+     */
+    def commentContentForm(implicit context: CurrentUserContext): Form[CommentContent] = Form(
+      context.currentUser.registered.map { user =>
         single("body" -> trimmedText.verifying(minLength(3))).transform[CommentContent](
           body => CommentContent(Left(user.id), body),
           commentContent => commentContent.body)
       }.getOrElse {
         mapping(
-          "name" -> tokenizedText.verifying(minLength(3)).transform[Either[UserId, String]](Right.apply, v => v.right.getOrElse("")),
+          "name" -> tokenizedText.verifying(minLength(3)).transform[Either[UserId, String]](Right.apply, _.right.getOrElse("")),
           "body" -> trimmedText.verifying(minLength(3)))(CommentContent.apply)(CommentContent.unapply)
       })
 
     def add(postId: PostId, expected: StreamRevision) = CommandAction { posts => implicit request =>
-      posts.get(postId) map { post =>
+      posts.get(postId).filter(request.currentUser.canAddComment) map { post =>
         commentContentForm.bindFromRequest.fold(
           formWithErrors =>
             abort(BadRequest(views.html.posts.show(post, formWithErrors))),
