@@ -42,18 +42,26 @@ class PostsController(actions: ApplicationActions[Posts, PostEvent]) {
    * Show and submit actions for adding a new blog post.
    */
   object add {
-    def show = AuthenticatedQueryAction { _ => _ => implicit request =>
-      Ok(views.html.posts.add(PostId.generate(), postContentForm))
+    def show = AuthenticatedQueryAction { user => _ => implicit request =>
+      if (user.canAddPost) {
+        Ok(views.html.posts.add(PostId.generate(), postContentForm))
+      } else {
+        notFound
+      }
     }
 
-    def submit(id: PostId) = AuthenticatedCommandAction { user => posts => implicit request =>
-      postContentForm.bindFromRequest.fold(
-        formWithErrors =>
-          abort(BadRequest(views.html.posts.add(id, formWithErrors))),
-        postContent =>
-          Changes(StreamRevision.Initial, PostAdded(id, user.id, postContent): PostEvent).commit(
-            onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post added."),
-            onConflict = conflict => Conflict(views.html.posts.edit(id, conflict.actual, postContentForm.fill(postContent), conflict.events))))
+    def submit(id: PostId) = AuthenticatedCommandAction { user => _ => implicit request =>
+      if (user.canAddPost) {
+        postContentForm.bindFromRequest.fold(
+          formWithErrors =>
+            abort(BadRequest(views.html.posts.add(id, formWithErrors))),
+          postContent =>
+            Changes(StreamRevision.Initial, PostAdded(id, user.id, postContent): PostEvent).commit(
+              onCommit = Redirect(routes.PostsController.show(id)).flashing("info" -> "Post added."),
+              onConflict = conflict => Conflict(views.html.posts.edit(id, conflict.actual, postContentForm.fill(postContent), conflict.events))))
+      } else {
+        abort(notFound)
+      }
     }
   }
 
