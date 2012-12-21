@@ -9,8 +9,6 @@ import play.api.test.Helpers._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class MemoryImageActionsSpec extends org.specs2.mutable.Specification {
-  sequential
-
   "Memory image actions" should {
     "commit changes to event store" in new fixture {
       val response = testCommandAction.apply(authenticatedRequest)
@@ -27,9 +25,8 @@ class MemoryImageActionsSpec extends org.specs2.mutable.Specification {
     }
 
     "add current user id to commit headers" in new fixture {
-      val response = testCommandAction.apply(authenticatedRequest)
+      testCommandAction.apply(authenticatedRequest)
 
-      val commits = eventStore.reader.readStream[PostId, PostEvent](postId)
       val commit = commits.headOption.getOrElse(failure("no commit"))
       commit.headers must contain("currentUserId" -> currentUserId.toString)
     }

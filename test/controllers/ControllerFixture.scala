@@ -38,7 +38,8 @@ trait ControllerFixture extends After {
     UserLoggedIn(currentUserId, authenticationToken))
   val registeredUser = memoryImage.get.users.withAuthenticationToken(authenticationToken) getOrElse (sys.error("user not authenticated"))
 
-  def changes: Seq[DomainEvent] = eventStore.reader.readCommits(initialStoreRevision, StoreRevision.Maximum).flatMap(_.events).toSeq
+  def commits: Stream[eventstore.Commit[DomainEvent]] = eventStore.reader.readCommits(initialStoreRevision, StoreRevision.Maximum)
+  def changes: Seq[DomainEvent] = commits.flatMap(_.events).toSeq
 
   override def after {
     eventStore.close
