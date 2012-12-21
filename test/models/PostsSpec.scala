@@ -9,29 +9,28 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
   "posts" should {
     val A = PostId.generate()
     val B = PostId.generate()
-    val Author = UserId.generate()
+    val AuthorId = UserId.generate()
     val AuthorDisplayName = "Joe"
     val Content = PostContent(title = "title", body = "body")
     val Updated = Content.copy(body = "updated")
 
     "contain added post" in {
-      val post = given(PostAdded(A, Author, Content)).post(A)
-      post must_== Post(A, StreamRevision(1), Author, Content)
+      val post = given(PostAdded(A, AuthorId, Content)).post(A)
+      post must_== Post(A, StreamRevision(1), AuthorId, Content)
     }
 
     "contain edited post" in {
-      val post = given(PostAdded(A, Author, Content), PostEdited(A, Updated)).post(A)
-      post must_== Post(A, StreamRevision(2), Author, Updated)
+      val post = given(PostAdded(A, AuthorId, Content), PostEdited(A, Updated)).post(A)
+      post must_== Post(A, StreamRevision(2), AuthorId, Updated)
     }
 
     "remove deleted post" in {
-      val posts = given(PostAdded(A, Author, Content), PostDeleted(A)).posts
+      val posts = given(PostAdded(A, AuthorId, Content), PostDeleted(A)).posts
       posts.get(A) must beNone
     }
 
     "track the stream revision per post" in eventsForMultiplePosts { events =>
       val fixture = given(events: _*)
-
       fixture.streamRevisions must haveAllElementsLike {
         case (postId, revision) => fixture.posts.get(postId).map(_.revision must_== revision).getOrElse(ok)
       }
@@ -50,7 +49,7 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
 
     val CommentContent_1 = CommentContent(Right("Commenter"), "Body 1")
     "contain added comment" in {
-      val post = given(PostAdded(A, Author, Content), CommentAdded(A, CommentId(1), CommentContent_1)).post(A)
+      val post = given(PostAdded(A, AuthorId, Content), CommentAdded(A, CommentId(1), CommentContent_1)).post(A)
 
       post.nextCommentId must_== CommentId(2)
       post.comments must_== SortedMap(CommentId(1) -> Comment(CommentId(1), CommentContent_1))
@@ -58,7 +57,7 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
 
     "remove deleted comment" in {
       val post = given(
-        PostAdded(A, Author, Content),
+        PostAdded(A, AuthorId, Content),
         CommentAdded(A, CommentId(1), CommentContent_1), CommentDeleted(A, CommentId(1))).post(A)
 
       post.nextCommentId must_== CommentId(2)
