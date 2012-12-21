@@ -79,9 +79,7 @@ class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
     }
   }
 
-  def given(events: PostEvent*) = new Fixture(events: _*)
-
-  class Fixture(events: PostEvent*) extends eventstore.MemoryImageFixture(events: _*) {
+  case class given(events: PostEvent*) extends eventstore.MemoryImageFixture(events: _*) {
     val posts = eventsWithRevision.foldLeft(Posts()) {
       case (posts, (event, revision)) => posts.update(event, revision)
     }

@@ -56,9 +56,7 @@ class UsersSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
     }
   }
 
-  def given(events: UserEvent*) = new Fixture(events: _*)
-
-  class Fixture(events: UserEvent*) extends eventstore.MemoryImageFixture(events: _*) {
+  case class given(events: UserEvent*) extends eventstore.MemoryImageFixture(events: _*) {
     val users = eventsWithRevision.foldLeft(Users()) {
       case (users, (event, revision)) => users.update(event, revision)
     }
