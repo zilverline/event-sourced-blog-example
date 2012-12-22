@@ -14,7 +14,7 @@ object JsonMapping {
    * Define a JSON Format using the provided `reader` and `writer` functions.
    */
   def format[A](reader: JsValue => A)(writer: A => JsValue): Format[A] = new Format[A] {
-    override def reads(json: JsValue) = reader(json)
+    override def reads(json: JsValue) = JsSuccess(reader(json))
     override def writes(o: A) = writer(o)
   }
 
@@ -42,13 +42,13 @@ object JsonMapping {
     /**
      * Combine two type choice formats.
      */
-    def and[RR >: R](that: TypeChoiceFormat[_ <: RR])(implicit manifest: Manifest[RR]): TypeChoiceFormat[RR] =
-      new TypeChoiceFormat[RR](this.choices ++ that.choices)
+    def and[RR >: R](that: TypeChoiceFormat[_ <: RR]): TypeChoiceFormat[RR] =
+      new TypeChoiceFormat[RR]((this.choices: Seq[TypeChoiceMapping[_ <: RR]]) ++ (that.choices: Seq[TypeChoiceMapping[_ <: RR]]))
 
     override def reads(json: JsValue) = {
       val name = (json \ "type").as[String]
       val mapping = choices.find(_.typeName == name).getOrElse(throw new IllegalArgumentException("no mapping for type '" + name + "'"))
-      mapping.fromJson(json \ "data")
+      JsSuccess(mapping.fromJson(json \ "data"))
     }
     override def writes(o: R) = {
       val mapping = choices.find(_.matchesInstance(o)).getOrElse(throw new IllegalArgumentException("no mapping found for instance " + o))
@@ -59,13 +59,14 @@ object JsonMapping {
     def apply[R](choices: TypeChoiceMapping[_ <: R]*): TypeChoiceFormat[R] = new TypeChoiceFormat[R](choices)
   }
 
-  case class TypeChoiceMapping[A](typeName: String, format: Format[A], manifest: Manifest[A]) {
-    def erasure: Class[_] = manifest.erasure
-    def matchesInstance(o: Any) = manifest.erasure.isInstance(o)
+  implicit class TypeChoiceMapping[A](typeAndFormat: (String, Format[A]))(implicit val manifest: Manifest[A]) {
+    def typeName = typeAndFormat._1
+    def format = typeAndFormat._2
+    def erasure: Class[_] = manifest.runtimeClass
+    def matchesInstance(o: Any) = manifest.runtimeClass.isInstance(o)
     def fromJson(json: JsValue) = json.as(format)
     def toJson(o: Any) = Json.toJson(o.asInstanceOf[A])(format)
   }
-  implicit def typeAndFormatToChoiceMapping[A](typeAndFormat: (String, Format[A]))(implicit m: Manifest[A]): TypeChoiceMapping[A] = TypeChoiceMapping(typeAndFormat._1, typeAndFormat._2, m)
 
   /**
    * Maps an `Either[A, B]` to a JSON object. When the mapped value is `Left(a)` the JSON object will
@@ -74,8 +75,8 @@ object JsonMapping {
    */
   def eitherFormat[A: Format, B: Format](left: String, right: String): Format[Either[A, B]] = new Format[Either[A, B]] {
     override def reads(json: JsValue) = (json \ left) match {
-      case JsUndefined(_) => Right((json \ right).as[B])
-      case a              => Left(a.as[A])
+      case JsUndefined(_) => JsSuccess(Right((json \ right).as[B]))
+      case a              => JsSuccess(Left(a.as[A]))
     }
     override def writes(o: Either[A, B]) = o match {
       case Left(a)  => JsObject(Seq(left -> toJson(a)))
@@ -87,7 +88,7 @@ object JsonMapping {
    * Maps an instance to a JSON object with a field named `a` using the provided `apply` and `unapply` functions.
    */
   def objectFormat[R, A: Format](a: String)(apply: A => R)(unapply: R => Option[A]): Format[R] = new Format[R] {
-    override def reads(json: JsValue) = apply((json \ a).as[A])
+    override def reads(json: JsValue) = JsSuccess(apply((json \ a).as[A]))
     override def writes(o: R) = {
       val unapplied = extract(o, unapply)
       JsObject(Seq(a -> toJson(unapplied)))
@@ -98,7 +99,7 @@ object JsonMapping {
    * Maps an instance to a JSON object with a fields named `a` and `b` using the provided `apply` and `unapply` functions.
    */
   def objectFormat[R, A: Format, B: Format](a: String, b: String)(apply: (A, B) => R)(unapply: R => Option[(A, B)]): Format[R] = new Format[R] {
-    override def reads(json: JsValue) = apply((json \ a).as[A], (json \ b).as[B])
+    override def reads(json: JsValue) = JsSuccess(apply((json \ a).as[A], (json \ b).as[B]))
     override def writes(o: R) = {
       val unapplied = extract(o, unapply)
       JsObject(Seq(a -> toJson(unapplied._1), b -> toJson(unapplied._2)))
@@ -109,7 +110,7 @@ object JsonMapping {
    * Maps an instance to a JSON object with a fields named `a`, `b`, and `c` using the provided `apply` and `unapply` functions.
    */
   def objectFormat[R, A: Format, B: Format, C: Format](a: String, b: String, c: String)(apply: (A, B, C) => R)(unapply: R => Option[(A, B, C)]): Format[R] = new Format[R] {
-    override def reads(json: JsValue) = apply((json \ a).as[A], (json \ b).as[B], (json \ c).as[C])
+    override def reads(json: JsValue) = JsSuccess(apply((json \ a).as[A], (json \ b).as[B], (json \ c).as[C]))
     override def writes(o: R) = {
       val unapplied = extract(o, unapply)
       JsObject(Seq(a -> toJson(unapplied._1), b -> toJson(unapplied._2), c -> toJson(unapplied._3)))
@@ -120,7 +121,7 @@ object JsonMapping {
    * Maps an instance to a JSON object with a fields named `a`, `b`, `c`, and `d` using the provided `apply` and `unapply` functions.
    */
   def objectFormat[R, A: Format, B: Format, C: Format, D: Format](a: String, b: String, c: String, d: String)(apply: (A, B, C, D) => R)(unapply: R => Option[(A, B, C, D)]): Format[R] = new Format[R] {
-    override def reads(json: JsValue) = apply((json \ a).as[A], (json \ b).as[B], (json \ c).as[C], (json \ d).as[D])
+    override def reads(json: JsValue) = JsSuccess(apply((json \ a).as[A], (json \ b).as[B], (json \ c).as[C], (json \ d).as[D]))
     override def writes(o: R) = {
       val unapplied = extract(o, unapply)
       JsObject(Seq(a -> toJson(unapplied._1), b -> toJson(unapplied._2), c -> toJson(unapplied._3), d -> toJson(unapplied._4)))
@@ -131,7 +132,7 @@ object JsonMapping {
    * Maps an instance to a JSON object with a fields named `a`, `b`, `c`, `d`, and `e` using the provided `apply` and `unapply` functions.
    */
   def objectFormat[R, A: Format, B: Format, C: Format, D: Format, E: Format](a: String, b: String, c: String, d: String, e: String)(apply: (A, B, C, D, E) => R)(unapply: R => Option[(A, B, C, D, E)]): Format[R] = new Format[R] {
-    override def reads(json: JsValue) = apply((json \ a).as[A], (json \ b).as[B], (json \ c).as[C], (json \ d).as[D], (json \ e).as[E])
+    override def reads(json: JsValue) = JsSuccess(apply((json \ a).as[A], (json \ b).as[B], (json \ c).as[C], (json \ d).as[D], (json \ e).as[E]))
     override def writes(o: R) = {
       val unapplied = extract(o, unapply)
       JsObject(Seq(a -> toJson(unapplied._1), b -> toJson(unapplied._2), c -> toJson(unapplied._3), d -> toJson(unapplied._4), e -> toJson(unapplied._5)))
@@ -142,10 +143,10 @@ object JsonMapping {
    * Maps an instance to a JSON object with a fields named `a`, `b`, `c`, `d`, `e`, and 'f' using the provided `apply` and `unapply` functions.
    */
   def objectFormat[R, A: Format, B: Format, C: Format, D: Format, E: Format, F: Format](a: String, b: String, c: String, d: String, e: String, f: String)(apply: (A, B, C, D, E, F) => R)(unapply: R => Option[(A, B, C, D, E, F)]): Format[R] = new Format[R] {
-      override def reads(json: JsValue) = apply((json \ a).as[A], (json \ b).as[B], (json \ c).as[C], (json \ d).as[D], (json \ e).as[E], (json \ f).as[F])
-              override def writes(o: R) = {
-          val unapplied = extract(o, unapply)
-                  JsObject(Seq(a -> toJson(unapplied._1), b -> toJson(unapplied._2), c -> toJson(unapplied._3), d -> toJson(unapplied._4), e -> toJson(unapplied._5), f -> toJson(unapplied._6)))
-      }
+    override def reads(json: JsValue) = JsSuccess(apply((json \ a).as[A], (json \ b).as[B], (json \ c).as[C], (json \ d).as[D], (json \ e).as[E], (json \ f).as[F]))
+    override def writes(o: R) = {
+      val unapplied = extract(o, unapply)
+      JsObject(Seq(a -> toJson(unapplied._1), b -> toJson(unapplied._2), c -> toJson(unapplied._3), d -> toJson(unapplied._4), e -> toJson(unapplied._5), f -> toJson(unapplied._6)))
+    }
   }
 }

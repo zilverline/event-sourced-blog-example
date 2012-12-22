@@ -23,7 +23,7 @@ class FakeEventStore[Event] extends EventStore[Event] {
   private[this] val commits = Ref(Vector.empty[Commit[Event]]).single
   private[this] val streams = Ref(Map.empty[Any, Vector[Commit[Event]]]).single
 
-  override def toString = "FakeEventStore(" + reader.storeRevision + ")"
+  override def toString = s"FakeEventStore(${reader.storeRevision})"
 
   override object reader extends CommitReader[Event] {
     override def storeRevision = StoreRevision(commits().size)
@@ -97,7 +97,7 @@ class FakeEventStore[Event] extends EventStore[Event] {
 
       new Subscription {
         override def cancel() = cancelled.set(true)
-        override def toString = "Subscription(" + last() + ", " + cancelled() + ", " + FakeEventStore.this + ")"
+        override def toString = s"Subscription(${last()}, ${cancelled()}, ${FakeEventStore.this})"
       }
     }
   }

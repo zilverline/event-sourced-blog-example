@@ -10,11 +10,11 @@ class RedisEmailRegistry(jedis: Jedis, redisKey: String) {
     result match {
       case 0L =>
         val existingUserId = jedis.hget(redisKey, email.toString)
-        UserId.fromString(existingUserId).getOrElse(sys.error("cannot parse user id: " + existingUserId))
+        UserId.fromString(existingUserId).getOrElse(sys.error(s"cannot parse user id: $existingUserId"))
       case 1L =>
         requestedUserId
       case _ =>
-        sys.error("unexpected Redis return value: " + result)
+        sys.error(s"unexpected Redis return value: $result")
     }
   }
 }

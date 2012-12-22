@@ -2,6 +2,9 @@ package eventstore
 
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import scala.concurrent._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import Transaction._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
@@ -57,7 +60,7 @@ class MemoryImageSpec extends org.specs2.mutable.Specification with org.specs2.S
     "retry on transaction conflict" in new fixture {
       val latch = new CountDownLatch(1)
 
-      val first = concurrent.ops.future {
+      val first = Future {
         subject.modify { state =>
           latch.await(5, TimeUnit.SECONDS)
           Changes("id", StreamRevision(state.size), state.size.toString).commit(
@@ -73,7 +76,7 @@ class MemoryImageSpec extends org.specs2.mutable.Specification with org.specs2.S
       }
 
       latch.countDown()
-      first()
+      Await.result(first, Duration(1, TimeUnit.SECONDS))
 
       eventStore.reader.readStream("id").flatMap(_.events) must_== Seq("0", "1")
     }

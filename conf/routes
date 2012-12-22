@@ -8,29 +8,29 @@ GET     /                           controllers.Application.index
 # Blog posts
 GET     /posts                      controllers.Default.redirect(to="/posts/")
 GET     /posts/                     controllers.PostsController.index
-GET     /posts/new                  controllers.PostsController.add.show
-POST    /posts/:id/add              controllers.PostsController.add.submit(id: PostId)
-GET     /posts/:id/edit             controllers.PostsController.edit.show(id: PostId)
-POST    /posts/:id/edit             controllers.PostsController.edit.submit(id: PostId, r: StreamRevision)
+GET     /posts/new                  controllers.PostsController.showAdd
+POST    /posts/:id/add              controllers.PostsController.add(id: PostId)
+GET     /posts/:id/edit             controllers.PostsController.showEdit(id: PostId)
+POST    /posts/:id/edit             controllers.PostsController.edit(id: PostId, r: StreamRevision)
 POST    /posts/:id/delete           controllers.PostsController.delete(id: PostId, r: StreamRevision)
 GET     /posts/:id                  controllers.PostsController.show(id: PostId)
 
-POST    /posts/:postId/comments/                   controllers.PostsController.comments.add(postId: PostId, r: StreamRevision)
-POST    /posts/:postId/comments/:commentId/delete  controllers.PostsController.comments.delete(postId: PostId, r: StreamRevision, commentId: CommentId)
+POST    /posts/:postId/comments/                   controllers.PostsController.addComment(postId: PostId, r: StreamRevision)
+POST    /posts/:postId/comments/:commentId/delete  controllers.PostsController.deleteComment(postId: PostId, r: StreamRevision, commentId: CommentId)
 
 # Users
-GET     /users/log-in               controllers.UsersController.authentication.show
-POST    /users/log-in               controllers.UsersController.authentication.submit
-GET     /users/logged-out           controllers.UsersController.authentication.loggedOut
-GET     /users/register             controllers.UsersController.register.show
-POST    /users/register             controllers.UsersController.register.submit
-GET     /users/registered           controllers.UsersController.register.registered
-GET     /users/logged-in            controllers.UsersController.authentication.loggedIn
-GET     /users/log-out              controllers.UsersController.authentication.logOut
-GET     /profile                    controllers.UsersController.profile.show
-POST    /profile                    controllers.UsersController.profile.changeProfile
-POST    /profile/email              controllers.UsersController.profile.changeEmailAddress
-POST    /profile/password           controllers.UsersController.profile.changePassword
+GET     /log-in                     controllers.UsersController.showLogIn
+POST    /log-in                     controllers.UsersController.logIn
+GET     /logged-in                  controllers.UsersController.loggedIn
+GET     /log-out                    controllers.UsersController.logOut
+GET     /logged-out                 controllers.UsersController.loggedOut
+GET     /register                   controllers.UsersController.showRegister
+POST    /register                   controllers.UsersController.register
+GET     /registered                 controllers.UsersController.registered
+GET     /profile                    controllers.UsersController.showProfile
+POST    /profile                    controllers.UsersController.changeProfile
+POST    /profile/email              controllers.UsersController.changeEmailAddress
+POST    /profile/password           controllers.UsersController.changePassword
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.at(path="/public", file)

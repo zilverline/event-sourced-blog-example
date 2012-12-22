@@ -18,7 +18,7 @@
               <fieldset class="btn-group">
               <a class="btn" href="@routes.PostsController.show(post.id)">Show</a>
               @if(context.currentUser.canEditPost(post)) {
-                <a class="btn" href="@routes.PostsController.edit.show(post.id)">Edit</a>
+                <a class="btn" href="@routes.PostsController.showEdit(post.id)">Edit</a>
               }
               @if(context.currentUser.canDeletePost(post)) {
                 <button class="btn">Delete</button>
@@ -32,6 +32,6 @@
   </table>
 
   @if(context.currentUser.canAddPost) {
-    <a class="btn" href="@routes.PostsController.add.show">New Post</a>
+    <a class="btn" href="@routes.PostsController.showAdd">New Post</a>
   }
 }

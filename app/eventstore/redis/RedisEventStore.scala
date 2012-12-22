@@ -96,7 +96,7 @@ abstract class RedisEventStore[Event] protected (name: String, host: String, por
   }
 
   // Helpers to serialize and deserialize commits.
-  protected[this] def deserializeCommit(serialized: String): Commit[Event] = Json.fromJson[Commit[Event]](Json.parse(serialized))
+  protected[this] def deserializeCommit(serialized: String): Commit[Event] = Json.fromJson[Commit[Event]](Json.parse(serialized)).get
   protected[this] def serializeCommit(commit: Commit[Event]): String = Json.stringify(Json.toJson(commit))
 
   override object reader extends CommitReader[Event] {
@@ -199,7 +199,7 @@ abstract class RedisEventStore[Event] protected (name: String, host: String, por
           withJedis { _.publish(ControlChannel, unsubscribeToken) }
         }
 
-        override def toString = "Subscription(" + last + ", " + cancelled + ", " + RedisEventStore.this + ")"
+        override def toString = s"Subscription($last, $cancelled, ${RedisEventStore.this})"
       }
     }
   }

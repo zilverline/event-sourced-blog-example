@@ -10,7 +10,7 @@ object Binders {
     override def bind(key: String, value: String) = try {
       Right(companion.apply(UUID.fromString(URLDecoder.decode(value, "utf-8"))))
     } catch {
-      case _: RuntimeException => Left("Cannot parse parameter " + key + " as " + companion.prefix + ": " + URLDecoder.decode(value, "utf-8"))
+      case _: RuntimeException => Left(s"Cannot parse parameter $key as ${companion.prefix}: ${URLDecoder.decode(value, "utf-8")}")
     }
     override def unbind(key: String, value: A) = value.uuid.toString
   }
@@ -19,7 +19,7 @@ object Binders {
     override def bind(key: String, value: String) = try {
       Right(CommentId(URLDecoder.decode(value, "utf-8").toInt))
     } catch {
-      case _: RuntimeException => Left("Cannot parse parameter " + key + " as CommentId: " + URLDecoder.decode(value, "utf-8"))
+      case _: RuntimeException => Left(s"Cannot parse parameter $key as CommentId: ${URLDecoder.decode(value, "utf-8")}")
     }
     override def unbind(key: String, value: CommentId) = value.value.toString
   }
@@ -29,10 +29,10 @@ object Binders {
       try {
         Right(StoreRevision(value.toLong))
       } catch {
-        case _: RuntimeException => Left("Cannot parse parameter " + key + " as StoreRevision: " + value)
+        case _: RuntimeException => Left(s"Cannot parse parameter $key as StoreRevision: $value")
       }
     }
-    override def unbind(key: String, value: StoreRevision) = key + "=" + value.value
+    override def unbind(key: String, value: StoreRevision) = s"$key=${value.value}"
   }
 
   implicit object queryStringBindableStreamRevision extends play.api.mvc.QueryStringBindable[StreamRevision] {
@@ -40,9 +40,9 @@ object Binders {
       try {
         Right(StreamRevision(value.toLong))
       } catch {
-        case _: RuntimeException => Left("Cannot parse parameter " + key + " as StreamRevision: " + value)
+        case _: RuntimeException => Left(s"Cannot parse parameter $key as StreamRevision: $value")
       }
     }
-    override def unbind(key: String, value: StreamRevision) = key + "=" + value.value
+    override def unbind(key: String, value: StreamRevision) = s"$key=${value.value}"
   }
 }

@@ -88,7 +88,7 @@ trait RedisWatchMultiExecEventCommitter[Event] { this: RedisEventStore[Event] =>
     var tries: Int = 0
 
     def once: Unit = {
-      Thread.sleep(tries * (util.Random.nextInt(10) + 1))
+      Thread.sleep(tries * (scala.util.Random.nextInt(10) + 1))
       tries += 1
     }
   }

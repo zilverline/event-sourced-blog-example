@@ -14,14 +14,14 @@ class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.Sc
 
   "Post events" should {
     "convert to and from JSON" in eventsForMultiplePosts { events =>
-      Json.fromJson[List[PostEvent]](Json.toJson(events)) must_== events
+      Json.fromJson[List[PostEvent]](Json.toJson(events)) must_== JsSuccess(events)
     }
 
     "parse example Post Added event" in {
       val event = PostAdded(PostId(UUID.fromString("5ab11526-477b-43b9-8fe6-4bb25a3dfcc6")), UserId(UUID.fromString("5ab11526-477b-43b9-8fe6-4bb25a3dfcc5")), PostContent(title = "Title", body = "Body"))
       val json = """{"type":"PostAdded","data":{"postId":"5ab11526-477b-43b9-8fe6-4bb25a3dfcc6","authorId":"5ab11526-477b-43b9-8fe6-4bb25a3dfcc5", "content":{"author":"Author","title":"Title","body":"Body"}}}"""
 
-      Json.fromJson[PostEvent](Json.parse(json)) must_== event
+      Json.fromJson[PostEvent](Json.parse(json)) must_== JsSuccess(event)
     }
   }
 

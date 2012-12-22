@@ -25,7 +25,7 @@ class IdentifierSpec extends org.specs2.mutable.Specification with org.specs2.Sc
     }
 
     "convert to and from JSON" in prop { (id: Id) =>
-      Json.fromJson[Id](Json.toJson(id)) must_== id
+      Json.fromJson[Id](Json.toJson(id)) must_== JsSuccess(id)
     }
 
     "fail to parse invalid strings" in prop { (s: String) =>

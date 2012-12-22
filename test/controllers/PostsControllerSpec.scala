@@ -23,14 +23,14 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     }
 
     "add post" in new fixture {
-      val response = subject.add.submit(postId)(authenticatedRequest.withFormUrlEncodedBody("title" -> "title", "body" -> "body"))
+      val response = subject.add(postId)(authenticatedRequest.withFormUrlEncodedBody("title" -> "title", "body" -> "body"))
 
       status(response) must_== 303
       changes must_== Seq(PostAdded(postId, currentUserId, postContent))
     }
 
     "not allow adding post when not logged in" in new fixture {
-      val response = subject.add.submit(postId)(unauthenticatedRequest.withFormUrlEncodedBody("title" -> "title", "body" -> "body"))
+      val response = subject.add(postId)(unauthenticatedRequest.withFormUrlEncodedBody("title" -> "title", "body" -> "body"))
 
       status(response) must_== 404
       changes must beEmpty
@@ -39,7 +39,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     "edit post" in new fixture {
       given(PostAdded(postId, currentUserId, postContent): PostEvent)
 
-      val response = subject.edit.submit(postId, StreamRevision(1))(authenticatedRequest.withFormUrlEncodedBody("title" -> "edited title", "body" -> "edited body"))
+      val response = subject.edit(postId, StreamRevision(1))(authenticatedRequest.withFormUrlEncodedBody("title" -> "edited title", "body" -> "edited body"))
 
       status(response) must_== 303
       changes must_== Seq(PostEdited(postId, PostContent(title = "edited title", body = "edited body")))
@@ -48,7 +48,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     "not allow editing by unauthorized user" in new fixture {
       given(PostAdded(postId, currentUserId, postContent): PostEvent)
 
-      val response = subject.edit.submit(postId, StreamRevision(1))(unauthenticatedRequest.withFormUrlEncodedBody("title" -> "edited title", "body" -> "edited body"))
+      val response = subject.edit(postId, StreamRevision(1))(unauthenticatedRequest.withFormUrlEncodedBody("title" -> "edited title", "body" -> "edited body"))
 
       status(response) must_== 404
       changes must beEmpty
@@ -76,7 +76,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     "add comment to post when logged in" in new fixture {
       given(PostAdded(postId, currentUserId, postContent): PostEvent)
 
-      val response = subject.comments.add(postId, StreamRevision(1))(authenticatedRequest.withFormUrlEncodedBody("body" -> "Body"))
+      val response = subject.addComment(postId, StreamRevision(1))(authenticatedRequest.withFormUrlEncodedBody("body" -> "Body"))
 
       status(response) must_== 303
       changes must_== Seq(CommentAdded(postId, CommentId(1), CommentContent(Left(currentUserId), "Body")))
@@ -85,7 +85,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
     "add comment to post when not logged in" in new fixture {
       given(PostAdded(postId, currentUserId, postContent): PostEvent)
 
-      val response = subject.comments.add(postId, StreamRevision(1))(unauthenticatedRequest.withFormUrlEncodedBody("name" -> "Commenter", "body" -> "Body"))
+      val response = subject.addComment(postId, StreamRevision(1))(unauthenticatedRequest.withFormUrlEncodedBody("name" -> "Commenter", "body" -> "Body"))
 
       status(response) must_== 303
       changes must_== Seq(CommentAdded(postId, CommentId(1), CommentContent(Right("Commenter"), "Body")))
@@ -96,7 +96,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
         PostAdded(postId, currentUserId, postContent): PostEvent,
         CommentAdded(postId, CommentId(1), CommentContent(Right("Commenter"), "Body")): PostEvent)
 
-      val response = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(authenticatedRequest)
+      val response = subject.deleteComment(postId, StreamRevision(2), CommentId(1))(authenticatedRequest)
 
       status(response) must_== 303
       changes must_== Seq(CommentDeleted(postId, CommentId(1)))
@@ -107,7 +107,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
         PostAdded(postId, UserId.generate(), postContent): PostEvent,
         CommentAdded(postId, CommentId(1), CommentContent(Left(currentUserId), "Body")): PostEvent)
 
-      val response = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(authenticatedRequest)
+      val response = subject.deleteComment(postId, StreamRevision(2), CommentId(1))(authenticatedRequest)
 
       status(response) must_== 303
       changes must_== Seq(CommentDeleted(postId, CommentId(1)))
@@ -118,7 +118,7 @@ class PostsControllerSpec extends org.specs2.mutable.Specification {
         PostAdded(postId, UserId.generate(), postContent): PostEvent,
         CommentAdded(postId, CommentId(1), CommentContent(Left(UserId.generate()), "Body")): PostEvent)
 
-      val response = subject.comments.delete(postId, StreamRevision(2), CommentId(1))(authenticatedRequest)
+      val response = subject.deleteComment(postId, StreamRevision(2), CommentId(1))(authenticatedRequest)
 
       status(response) must_== 404
       changes must beEmpty

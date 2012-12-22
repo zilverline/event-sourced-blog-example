@@ -2,6 +2,7 @@ package eventstore
 
 import JsonMapping._
 import play.api.libs.json._
+import scala.reflect.ClassTag
 
 /**
  * The revision of an event store. The revision of an event store is
@@ -84,8 +85,8 @@ private[this] case class EventStreamChanges[A, Event](streamId: A, expected: Str
 case class Commit[+Event](storeRevision: StoreRevision, timestamp: Long, streamId: String, streamRevision: StreamRevision, events: Seq[Event], headers: Map[String, String]) {
   def eventsWithRevision: Seq[(Event, StreamRevision)] = events.map(event => (event, streamRevision))
 
-  def withOnlyEventsOfType[E](implicit manifest: Manifest[E]): Commit[E] = copy(events = events.collect {
-    case event if manifest.erasure.isInstance(event) => event.asInstanceOf[E]
+  def withOnlyEventsOfType[E](implicit manifest: ClassTag[E]): Commit[E] = copy(events = events.collect {
+    case event if manifest.runtimeClass.isInstance(event) => event.asInstanceOf[E]
   })
 
   def committedEvents: Seq[CommittedEvent[Event]] = events.map { event =>

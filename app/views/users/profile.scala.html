@@ -4,7 +4,7 @@
 @main("Your profile") {
   <h2>Profile</h2>
 
-  @helper.form(action = routes.UsersController.profile.changeProfile) {
+  @helper.form(action = routes.UsersController.changeProfile) {
     @globalErrorsPanel(profileForm)
     <fieldset>
       @helper.inputText(profileForm("displayName"), '_label -> Messages("displayName"), 'autofocus -> 'autofocus, 'required -> "required")
@@ -17,7 +17,7 @@
 
   <h2>Email</h2>
 
-  @helper.form(action = routes.UsersController.profile.changeEmailAddress) {
+  @helper.form(action = routes.UsersController.changeEmailAddress) {
     @globalErrorsPanel(emailForm)
     <fieldset>
       @helper.inputText(emailForm("email"), '_label -> Messages("email"), 'required -> "required")
@@ -29,7 +29,7 @@
   }
 
   <h2>Password</h2>
-  @helper.form(action = routes.UsersController.profile.changePassword) {
+  @helper.form(action = routes.UsersController.changePassword) {
     @globalErrorsPanel(passwordForm)
     <fieldset>
       @helper.inputPassword(passwordForm("password.old"), '_label -> Messages("password.old"), 'required -> "required")

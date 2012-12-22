@@ -1,6 +1,6 @@
 import sbt._
 import Keys._
-import PlayProject._
+import play.Project._
 
 object ApplicationBuild extends Build {
 
@@ -9,12 +9,15 @@ object ApplicationBuild extends Build {
 
   val appDependencies = Seq(
     "redis.clients" % "jedis" % "2.1.0",
-    "com.yammer.metrics" %% "metrics-scala" % "2.1.2",
+    "com.yammer.metrics" % "metrics-core" % "2.2.0",
+//    "com.yammer.metrics" %% "metrics-scala" % "2.2.0",
+//    "nl.grons" %% "metrics-scala" % "2.2.0",
     "com.lambdaworks" % "scrypt" % "1.3.3",
     "org.specs2" %% "specs2" % "1.12.3" % "test",
-    "org.scalacheck" %% "scalacheck" % "1.9" % "test")
+    "org.scalacheck" %% "scalacheck" % "1.10.0" % "test")
 
-  val main = PlayProject(appName, appVersion, appDependencies, mainLang = SCALA).settings(
+  val main = play.Project(appName, appVersion, appDependencies).settings(
+    scalaVersion := "2.10.0",
     routesImport ++= Seq("events._", "eventstore.{ StoreRevision, StreamRevision }", "support.Binders._"),
 
     templatesImport ++= Seq("events._", "eventstore.{ StoreRevision, StreamRevision }"),

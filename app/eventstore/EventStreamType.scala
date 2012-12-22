@@ -27,8 +27,8 @@ object EventStreamType {
     def streamId(event: Event) = eventToStreamId(event)
 
     def cast(event: Any): Event = {
-      if (manifest.erasure.isInstance(event)) event.asInstanceOf[Event]
-      else throw new ClassCastException(event + " is not an instance of " + manifest)
+      if (manifest.runtimeClass.isInstance(event)) event.asInstanceOf[Event]
+      else throw new ClassCastException(s"$event is not an instance of $manifest")
     }
   }
 }

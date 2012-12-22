@@ -28,7 +28,7 @@ class UserEventsSpec extends org.specs2.mutable.Specification with org.specs2.Sc
     }
 
     "convert to and from JSON" in prop { (password: Password) =>
-      Json.fromJson[Password](Json.toJson(password)) must_== password
+      Json.fromJson[Password](Json.toJson(password)) must_== JsSuccess(password)
     }
   }
 
@@ -46,7 +46,7 @@ class UserEventsSpec extends org.specs2.mutable.Specification with org.specs2.Sc
     }
 
     "convert to and from JSON" in prop { (token: AuthenticationToken) =>
-      Json.fromJson[AuthenticationToken](Json.toJson(token)) must_== token
+      Json.fromJson[AuthenticationToken](Json.toJson(token)) must_== JsSuccess(token)
     }
 
     "fail to parse invalid strings" in prop { (s: String) =>
@@ -59,7 +59,7 @@ class UserEventsSpec extends org.specs2.mutable.Specification with org.specs2.Sc
 
   "User events" should {
     "convert to and from JSON" in eventsForMultipleUsers { events =>
-      Json.fromJson[List[UserEvent]](Json.toJson(events)) must_== events
+      Json.fromJson[List[UserEvent]](Json.toJson(events)) must_== JsSuccess(events)
     }
   }
 }

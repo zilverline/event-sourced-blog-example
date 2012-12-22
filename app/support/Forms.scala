@@ -10,7 +10,7 @@ object Forms {
   val emailAddress = trimmedText.verifying(email.constraints: _*).transform[EmailAddress](EmailAddress.apply, _.value)
   val password = text.transform[String](identity, _ => "")
 
-  implicit def FormOps[T](form: Form[T]) = new {
+  implicit class FormOps[T](val form: Form[T]) extends AnyVal {
     def addError(error: FormError) = form.copy(errors = form.errors :+ error)
   }
 }

@@ -2,7 +2,7 @@
 @import views.support._
 
 @main("Log in") {
-  @helper.form(action = routes.UsersController.authentication.submit) {
+  @helper.form(action = routes.UsersController.logIn) {
     @globalErrorsPanel(form)
     <fieldset>
       @helper.inputText(form("email"), '_label -> Messages("email"), 'autofocus -> "autofocus", 'required -> "required")

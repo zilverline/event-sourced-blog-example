@@ -44,18 +44,22 @@ class StoreRevisionSpec extends org.specs2.mutable.Specification with org.specs2
         a.next must not be_< (a)
       }
     }
+
     "support ordering - equality" in forAll { (a: StoreRevision) =>
       a == a && a <= a && a >= a
     }
-    "support ordering - transitivity" in check(forAll { (a: StoreRevision, b: StoreRevision, c: StoreRevision) =>
-      (a < b && b < c) ==> a < c
-    })(set('minTestsOk -> 10))
+
+    "support ordering - transitivity" in prop { (a: StoreRevision, b: StoreRevision, c: StoreRevision) =>
+      val Seq(x, y, z) = Seq(a, b, c).sorted
+      (x < y && y < z) ==> x < z
+    }
+
     "support ordering - totality" in forAll { (a: StoreRevision, b: StoreRevision) =>
       a <= b || b <= a
     }
 
     "support JSON serialization" in forAll { (a: StoreRevision) =>
-      Json.fromJson[StoreRevision](Json.toJson(a)) must_== a
+      Json.fromJson[StoreRevision](Json.toJson(a)) must_== JsSuccess(a)
     }
   }
 }
@@ -87,18 +91,22 @@ class StreamRevisionSpec extends org.specs2.mutable.Specification with org.specs
         a.next must not be_< (a)
       }
     }
+
     "support ordering - equality" in forAll { (a: StreamRevision) =>
       a == a && a <= a && a >= a
     }
-    "support ordering - transitivity" in check(forAll { (a: StreamRevision, b: StreamRevision, c: StreamRevision) =>
-      (a < b && b < c) ==> a < c
-    })(set('minTestsOk -> 10))
+
+    "support ordering - transitivity" in prop { (a: StreamRevision, b: StreamRevision, c: StreamRevision) =>
+      val Seq(x, y, z) = Seq(a, b, c).sorted
+      (x < y && y < z) ==> x < z
+    }
+
     "support ordering - totality" in forAll { (a: StreamRevision, b: StreamRevision) =>
       a <= b || b <= a
     }
 
     "support JSON serialization" in forAll { (a: StreamRevision) =>
-      Json.fromJson[StreamRevision](Json.toJson(a)) must_== a
+      Json.fromJson[StreamRevision](Json.toJson(a)) must_== JsSuccess(a)
     }
   }
 }
@@ -110,11 +118,11 @@ class CommitSpec extends org.specs2.mutable.Specification with org.specs2.ScalaC
 
   "Commits" should {
     "deserialize example JSON" in {
-      Json.fromJson[Commit[String]](Json.parse(SerializedCommit)) must_== ExampleCommit
+      Json.fromJson[Commit[String]](Json.parse(SerializedCommit)) must_== JsSuccess(ExampleCommit)
     }
 
     "be serializable to and from JSON" in forAll { (commit: Commit[String]) =>
-      Json.fromJson[Commit[String]](Json.toJson(commit)) must_== commit
+      Json.fromJson[Commit[String]](Json.toJson(commit)) must_== JsSuccess(commit)
     }
 
     "combine event with stream revision" in {
@@ -210,7 +218,7 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
         countDown.await(2, TimeUnit.SECONDS) aka "the notification completed on time" must beTrue
         subscription.cancel()
 
-        notifications.result must_== subject.reader.readCommits(startRevision, StoreRevision.Maximum)
+        notifications.result must_== subject.reader.readCommits[String](startRevision, StoreRevision.Maximum)
       })
     }
 
@@ -231,7 +239,7 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
         countDown.await(2, TimeUnit.SECONDS) aka "the notification completed on time" must beTrue
         subscription.cancel()
 
-        notifications.result must_== subject.reader.readCommits(startRevision, StoreRevision.Maximum)
+        notifications.result must_== subject.reader.readCommits[String](startRevision, StoreRevision.Maximum)
       })
     }
   }

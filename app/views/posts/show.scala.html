@@ -6,7 +6,7 @@
     <p>@post.content.body -- <em>by @post.author.displayName</em></p>
     <div class="btn-group">
       @if(context.currentUser.canEditPost(post)) {
-        <a class="btn" href="@routes.PostsController.edit.show(post.id)">Edit</a>
+        <a class="btn" href="@routes.PostsController.showEdit(post.id)">Edit</a>
       }
       <a class="btn" href="@routes.PostsController.index()">Back</a>
     </div>
@@ -19,7 +19,7 @@
       <div style="display: inline-block;">
         @comment.content.body -- <em>by @comment.commenter.displayName</em>
         @if(context.currentUser.canDeleteComment(post, comment)) {
-          &nbsp; <form class="form-inline" style="display: inline-block;" action="@routes.PostsController.comments.delete(post.id, post.revision, commentId)" method="POST">
+          &nbsp; <form class="form-inline" style="display: inline-block;" action="@routes.PostsController.deleteComment(post.id, post.revision, commentId)" method="POST">
             <fieldset><button>&times;</button></fieldset>
           </form>
         }
@@ -30,12 +30,12 @@
   <br/>
   <h2>Add a comment:</h2>
 
-  @helper.form(action = routes.PostsController.comments.add(post.id, post.revision)) {
+  @helper.form(action = routes.PostsController.addComment(post.id, post.revision)) {
     @globalErrorsPanel(form)
     @conflictsMessagePanel(conflicts)
     <fieldset>
       @context.currentUser.registered.map { user =>
-        <p>Logged in as <a href="#">@user.displayName</a>. <a href="@routes.UsersController.authentication.logOut">Log out</a>.</p>
+        <p>Logged in as <a href="#">@user.displayName</a>. <a href="@routes.UsersController.logOut">Log out</a>.</p>
       }.getOrElse {
         @helper.inputText(form("name"), '_label -> "Name", 'required -> "required")
       }

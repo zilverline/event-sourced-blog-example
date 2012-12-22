@@ -18,7 +18,7 @@ case class EmailAddress(value: String) {
   // Pattern copied from play.api.data.Forms.email.
   require(
     value matches """\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}\b""",
-    "invalid email address: " + value)
+    s"invalid email address: $value")
 
   override def toString = value
 }
@@ -55,7 +55,7 @@ object AuthenticationToken {
   def generate(): AuthenticationToken = AuthenticationToken(Random.nextLong, Random.nextLong)
 
   def apply(value: String): AuthenticationToken = fromString(value) getOrElse {
-    throw new IllegalArgumentException("invalid authentication token '%s'".format(value))
+    throw new IllegalArgumentException(s"invalid authentication token '$value'")
   }
   def fromString(s: String): Option[AuthenticationToken] = s match {
     case Pattern(a, b) => Some(AuthenticationToken(BigInt(a, 16).longValue, BigInt(b, 16).longValue))

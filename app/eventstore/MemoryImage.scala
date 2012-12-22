@@ -23,8 +23,7 @@ object Transaction {
    */
   def abort[A](onAbort: => A): Transaction[Nothing, A] = new TransactionAbort(() => onAbort)
 
-  implicit def ChangesOps[Event](changes: Changes[Event]) = new ChangesOps(changes)
-  class ChangesOps[Event](changes: Changes[Event]) {
+  implicit class ChangesOps[Event](val changes: Changes[Event]) extends AnyVal {
     /**
      * Transaction result that will commit the  `changes` to the event store.
      */

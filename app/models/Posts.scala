@@ -31,7 +31,7 @@ case class Comment(id: CommentId, content: CommentContent) {
  * The current state of blog posts, derived from all committed PostEvents.
  */
 case class Posts(private val byId: Map[PostId, Post] = Map.empty,
-                 private val orderedByTimeAdded: Seq[PostId] = Vector.empty) {
+                 private val orderedByTimeAdded: Vector[PostId] = Vector.empty) {
 
   def get(id: PostId): Option[Post] = byId.get(id)
   def mostRecent(n: Int): Seq[Post] = orderedByTimeAdded.takeRight(n).reverse.flatMap(get)
@@ -41,7 +41,7 @@ case class Posts(private val byId: Map[PostId, Post] = Map.empty,
       this.copy(byId = byId.updated(id, Post(id, revision, authorId, content)), orderedByTimeAdded = orderedByTimeAdded :+ id)
 
     case PostDeleted(id) =>
-      this.copy(byId = byId - id, orderedByTimeAdded = orderedByTimeAdded.par.filterNot(_ == id).seq)
+      this.copy(byId = byId - id, orderedByTimeAdded = orderedByTimeAdded /*.par.filterNot(_ == id).seq*/)
 
     case PostEdited(id, content) =>
       modify(id) { post => post.copy(revision = revision, content = content) }
