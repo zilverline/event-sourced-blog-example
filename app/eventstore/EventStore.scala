@@ -1,6 +1,7 @@
 package eventstore
 
 import JsonMapping._
+import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import scala.reflect.ClassTag
 
@@ -24,7 +25,7 @@ object StoreRevision {
   val Initial = StoreRevision(0)
   val Maximum = StoreRevision(Long.MaxValue)
 
-  implicit val StoreRevisionFormat: Format[StoreRevision] = valueFormat(apply)(unapply)
+  implicit val StoreRevisionFormat: Format[StoreRevision] = valueFormat(apply)(_.value)
 }
 
 /**
@@ -47,7 +48,7 @@ object StreamRevision {
   val Initial = StreamRevision(0)
   val Maximum = StreamRevision(Long.MaxValue)
 
-  implicit val StreamRevisionFormat: Format[StreamRevision] = valueFormat(apply)(unapply)
+  implicit val StreamRevisionFormat: Format[StreamRevision] = valueFormat(apply)(_.value)
 }
 
 /**
@@ -94,7 +95,16 @@ case class Commit[+Event](storeRevision: StoreRevision, timestamp: Long, streamI
   }
 }
 object Commit {
-  implicit def CommitFormat[Event: Format]: Format[Commit[Event]] = objectFormat("storeRevision", "timestamp", "streamId", "streamRevision", "events", "headers")(apply[Event] _)(unapply)
+  // For some reason the Play format macro doesn't work with the commit class...
+  //  implicit def CommitFormat[Event: Format]: Format[Commit[Event]] = Json.format[Commit[Event]]
+  implicit def CommitFormat[Event: Format]: Format[Commit[Event]] = (
+    (__ \ "storeRevision").format[StoreRevision] and
+    (__ \ "timestamp").format[Long] and
+    (__ \ "streamId").format[String] and
+    (__ \ "streamRevision").format[StreamRevision] and
+    (__ \ "events").format[Seq[Event]] and
+    (__ \ "headers").format[Map[String, String]]
+  )(Commit.apply[Event] _, c => Commit.unapply(c).get)
 }
 
 /**

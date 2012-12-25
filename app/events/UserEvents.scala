@@ -5,7 +5,8 @@ import eventstore.ConflictsWith
 import eventstore.EventStreamType
 import eventstore.JsonMapping._
 import java.util.UUID
-import play.api.libs.json.Format
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 import scala.util.control.Exception.catching
 
 /**
@@ -25,7 +26,7 @@ case class EmailAddress(value: String) {
 object EmailAddress {
   def fromString(s: String): Option[EmailAddress] = catching(classOf[IllegalArgumentException]) opt EmailAddress(s)
 
-  implicit val EmailAddressFormat: Format[EmailAddress] = valueFormat(EmailAddress.apply)(EmailAddress.unapply)
+  implicit val EmailAddressFormat: Format[EmailAddress] = valueFormat(EmailAddress.apply)(_.value)
 }
 
 /**
@@ -42,7 +43,7 @@ object Password {
   def fromHash(hash: String): Password = Password(hash)
   def fromPlainText(password: String): Password = Password(SCryptUtil.scrypt(password, 1 << 14, 8, 2))
 
-  implicit val PasswordFormat: Format[Password] = valueFormat(Password.fromHash)(Password.unapply)
+  implicit val PasswordFormat: Format[Password] = valueFormat(Password.fromHash)(_.hash)
 }
 
 /**
@@ -62,7 +63,7 @@ object AuthenticationToken {
     case _             => None
   }
 
-  implicit val AuthenticationTokenFormat: Format[AuthenticationToken] = valueFormat(AuthenticationToken.apply)(x => Some(x.toString))
+  implicit val AuthenticationTokenFormat: Format[AuthenticationToken] = valueFormat(AuthenticationToken.apply)(_.toString)
 
   private val Pattern = """\b([0-9a-fA-F]{16})-([0-9a-fA-F]{16})\b""".r
   private val Random = new java.security.SecureRandom()
@@ -89,10 +90,10 @@ object UserEvent {
   }
 
   implicit val UserEventFormat: TypeChoiceFormat[UserEvent] = TypeChoiceFormat(
-    "UserRegistered" -> objectFormat("userId", "email", "displayName", "password")(UserRegistered.apply)(UserRegistered.unapply),
-    "UserProfileChanged" -> objectFormat("userId", "displayName")(UserProfileChanged.apply)(UserProfileChanged.unapply),
-    "UserEmailAddressChanged" -> objectFormat("userId", "email")(UserEmailAddressChanged.apply)(UserEmailAddressChanged.unapply),
-    "UserPasswordChanged" -> objectFormat("userId", "password")(UserPasswordChanged.apply)(UserPasswordChanged.unapply),
-    "UserLoggedIn" -> objectFormat("userId", "authenticationToken")(UserLoggedIn.apply)(UserLoggedIn.unapply),
-    "UserLoggedOut" -> objectFormat("userId")(UserLoggedOut.apply)(UserLoggedOut.unapply))
+    "UserRegistered"          -> Json.format[UserRegistered],
+    "UserProfileChanged"      -> Json.format[UserProfileChanged],
+    "UserEmailAddressChanged" -> Json.format[UserEmailAddressChanged],
+    "UserPasswordChanged"     -> Json.format[UserPasswordChanged],
+    "UserLoggedIn"            -> Json.format[UserLoggedIn],
+    "UserLoggedOut"           -> Json.format[UserLoggedOut])
 }

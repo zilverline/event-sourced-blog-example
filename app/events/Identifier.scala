@@ -19,7 +19,7 @@ abstract class IdentifierCompanion[A <: Identifier](val prefix: String) {
     case _                     => None
   }
 
-  implicit val IdentifierFormat: Format[A] = valueFormat(apply)(id => Some(id.uuid))
+  implicit val IdentifierFormat: Format[A] = valueFormat(apply)(_.uuid)
 
   implicit val IdentifierCompanionObject: IdentifierCompanion[A] = this
 

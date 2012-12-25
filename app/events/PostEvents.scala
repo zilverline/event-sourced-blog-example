@@ -4,6 +4,7 @@ import eventstore.ConflictsWith
 import eventstore.EventStreamType
 import eventstore.JsonMapping._
 import java.util.UUID
+import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 /**
@@ -14,7 +15,7 @@ object PostId extends IdentifierCompanion[PostId]("PostId")
 
 case class CommentId(value: Int)
 object CommentId {
-  implicit val CommentIdFormat: Format[CommentId] = valueFormat(apply)(unapply)
+  implicit val CommentIdFormat: Format[CommentId] = valueFormat(apply)(_.value)
   implicit val CommentIdOrdering: Ordering[CommentId] = Ordering.by(_.value)
 }
 
@@ -50,14 +51,16 @@ object PostEvent {
 
   implicit val PostEventStreamType: EventStreamType[PostId, PostEvent] = EventStreamType(_.toString, _.postId)
 
-  implicit val PostContentFormat: Format[PostContent] = objectFormat("title", "body")(PostContent.apply)(PostContent.unapply)
-  implicit val CommentContentFormat: Format[CommentContent] =
-    objectFormat("commenter", "body")(CommentContent.apply)(CommentContent.unapply)(eitherFormat("userId", "name"), implicitly)
+  implicit val PostContentFormat: Format[PostContent] = Json.format[PostContent]
+  implicit val CommentContentFormat: Format[CommentContent] = {
+    implicit val commenterFormat = eitherFormat[UserId, String]("userId", "name")
+    Json.format[CommentContent]
+  }
 
   implicit val PostEventFormat: TypeChoiceFormat[PostEvent] = TypeChoiceFormat(
-    "PostAdded"      -> objectFormat("postId", "authorId", "content")(PostAdded.apply)(PostAdded.unapply),
-    "PostEdited"     -> objectFormat("postId", "content")(PostEdited.apply)(PostEdited.unapply),
-    "PostDeleted"    -> objectFormat("postId")(PostDeleted.apply)(PostDeleted.unapply),
-    "CommentAdded"   -> objectFormat("postId", "commentId", "content")(CommentAdded.apply)(CommentAdded.unapply),
-    "CommentDeleted" -> objectFormat("postId", "commentId")(CommentDeleted.apply)(CommentDeleted.unapply))
+    "PostAdded"      -> Json.format[PostAdded],
+    "PostEdited"     -> Json.format[PostEdited],
+    "PostDeleted"    -> Json.format[PostDeleted],
+    "CommentAdded"   -> Json.format[CommentAdded],
+    "CommentDeleted" -> Json.format[CommentDeleted])
 }
