@@ -9,10 +9,10 @@ object ApplicationBuild extends Build {
 
   val appDependencies = Seq(
     "redis.clients" % "jedis" % "2.1.0",
-    "com.yammer.metrics" % "metrics-core" % "2.2.0",
-//    "com.yammer.metrics" %% "metrics-scala" % "2.2.0",
-//    "nl.grons" %% "metrics-scala" % "2.2.0",
+    "nl.grons" %% "metrics-scala" % "2.2.0",
     "com.lambdaworks" % "scrypt" % "1.3.3",
+    "org.apache.httpcomponents" % "httpcore" % "4.1.2",
+    "org.apache.httpcomponents" % "httpclient" % "4.1.2",
     "org.specs2" %% "specs2" % "1.12.3" % "test",
     "org.scalacheck" %% "scalacheck" % "1.10.0" % "test")
 
