@@ -2,6 +2,8 @@
 
 set -e
 
+MEM=${MEM:-256m}
+
 sbt stage && \
-  ./target/start -XX:+TieredCompilation -XX:+UseConcMarkSweepGC -Xms4G -Xmx4G "$@"
+  ./target/start -XX:+TieredCompilation -XX:+UseConcMarkSweepGC -Xms$MEM -Xmx$MEM "$@"
 
