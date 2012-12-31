@@ -1,4 +1,4 @@
-@(posts: Seq[Post], conflicts: Seq[PostEvent] = Nil)(implicit context: CurrentUserContext with UsersContext with FlashContext)
+@(posts: Seq[Post], conflicts: Seq[PostEvent] = Nil)(implicit context: ViewContext with UsersContext)
 
 @main("Blog Posts") {
   @conflictsMessagePanel(conflicts)

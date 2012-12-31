@@ -1,4 +1,4 @@
-@(id: PostId, form: Form[PostContent])(implicit context: CurrentUserContext with FlashContext)
+@(id: PostId, form: Form[PostContent])(implicit context: ViewContext)
 
 @main("New blog post") {
   @postContentForm(label = "Add", action = routes.PostsController.add(id), form = form)

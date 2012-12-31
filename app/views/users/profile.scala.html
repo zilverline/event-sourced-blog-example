@@ -1,4 +1,4 @@
-@(profileForm: Form[String], emailForm: Form[EmailAddress], passwordForm: Form[(String, Password)])(implicit context: CurrentUserContext with FlashContext)
+@(profileForm: Form[String], emailForm: Form[EmailAddress], passwordForm: Form[(String, Password)])(implicit context: ViewContext)
 @import views.support._
 
 @main("Your profile") {

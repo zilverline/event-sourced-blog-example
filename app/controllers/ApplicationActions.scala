@@ -6,14 +6,14 @@ import models._
 import play.api.mvc._
 import play.api.mvc.Results._
 
-trait FlashContext {
+trait ViewContext extends CurrentUserContext {
   def flash: Flash
 }
 
 /**
  * Extend Play's `Request` with user context information.
  */
-trait ApplicationRequestHeader extends RequestHeader with CurrentUserContext with UsersContext with FlashContext
+trait ApplicationRequestHeader extends RequestHeader with ViewContext with UsersContext
 class ApplicationRequest[A](val currentUser: User, val users: Users, request: Request[A])
   extends WrappedRequest(request) with ApplicationRequestHeader
 

@@ -1,4 +1,4 @@
-@(form: Form[(EmailAddress, String, Password)], conflicts: Seq[UserEvent] = Nil)(implicit request: ApplicationRequestHeader)
+@(form: Form[(EmailAddress, String, Password)], conflicts: Seq[UserEvent] = Nil)(implicit context: ViewContext)
 @import views.support._
 
 @main("Register") {

@@ -1,4 +1,4 @@
-@(post: Post, form: Form[CommentContent], conflicts: Seq[PostEvent] = Nil)(implicit context: CurrentUserContext with UsersContext with FlashContext)
+@(post: Post, form: Form[CommentContent], conflicts: Seq[PostEvent] = Nil)(implicit context: ViewContext with UsersContext)
 @import helper.twitterBootstrap._
 
 @main(post.content.title) {
