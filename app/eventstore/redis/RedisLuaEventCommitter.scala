@@ -4,7 +4,6 @@ package redis
 import org.joda.time.DateTimeUtils
 import play.api.Logger
 import play.api.libs.json._
-import _root_.redis.clients.jedis._
 import scala.collection.JavaConverters._
 
 trait RedisLuaEventCommitter[Event] { this: RedisEventStore[Event] =>

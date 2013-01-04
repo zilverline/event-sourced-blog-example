@@ -104,7 +104,7 @@ class MemoryImage[State, -Event: Manifest] private (eventStore: EventStore[Event
     runTransaction(eventStore.reader.storeRevision)
   }
 
-  override def toString = "MemoryImage(%s, %s)".format(revision.single.get, eventStore)
+  override def toString = s"MemoryImage(${revision.single.get}, $eventStore)"
 
   private[this] def getWithRevisionAt(minimum: StoreRevision): (State, StoreRevision) = atomic { implicit txn =>
     if (revision() < minimum) retry

@@ -18,7 +18,7 @@ object UserId extends IdentifierCompanion[UserId]("UserId")
 case class EmailAddress(value: String) {
   // Pattern copied from play.api.data.Forms.email.
   require(
-    value matches """\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}\b""",
+    value matches """\b[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\b""",
     s"invalid email address: $value")
 
   override def toString = value
@@ -26,7 +26,7 @@ case class EmailAddress(value: String) {
 object EmailAddress {
   def fromString(s: String): Option[EmailAddress] = catching(classOf[IllegalArgumentException]) opt EmailAddress(s)
 
-  implicit val EmailAddressFormat: Format[EmailAddress] = valueFormat(EmailAddress.apply)(_.value)
+  implicit val EmailAddressFormat: Format[EmailAddress] = valueFormat(apply)(_.value)
 }
 
 /**
@@ -43,14 +43,14 @@ object Password {
   def fromHash(hash: String): Password = Password(hash)
   def fromPlainText(password: String): Password = Password(SCryptUtil.scrypt(password, 1 << 14, 8, 2))
 
-  implicit val PasswordFormat: Format[Password] = valueFormat(Password.fromHash)(_.hash)
+  implicit val PasswordFormat: Format[Password] = valueFormat(fromHash)(_.hash)
 }
 
 /**
  * Authentication tokens used to track logged-in users. Represented as 128-bit randomly generated numbers.
  */
 case class AuthenticationToken private (a: Long, b: Long) {
-  override def toString = "%016x-%016x".format(a, b)
+  override def toString = f"$a%016x-$b%016x"
 }
 object AuthenticationToken {
   def generate(): AuthenticationToken = AuthenticationToken(Random.nextLong, Random.nextLong)

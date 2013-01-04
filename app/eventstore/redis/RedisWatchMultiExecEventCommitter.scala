@@ -2,9 +2,7 @@ package eventstore
 package redis
 
 import org.joda.time.DateTimeUtils
-import play.api.libs.json._
 import _root_.redis.clients.jedis._
-import scala.collection.JavaConverters._
 
 /**
  * Redis event committer that uses the WATCH/MULTI/EXEC commands to ensure the event store's
@@ -57,7 +55,7 @@ trait RedisWatchMultiExecEventCommitter[Event] { this: RedisEventStore[Event] =>
       pipeline.watch(CommitsKey, streamKey)
       val storeRevision = pipeline.hlen(CommitsKey)
       val streamRevision = pipeline.llen(streamKey)
-      pipeline.sync
+      pipeline.sync()
 
       (StoreRevision(storeRevision.get), StreamRevision(streamRevision.get))
     }
@@ -78,7 +76,7 @@ trait RedisWatchMultiExecEventCommitter[Event] { this: RedisEventStore[Event] =>
       pipeline.rpush(streamKey, commitId)
       pipeline.publish(CommitsKey, commitData)
       val exec = pipeline.exec
-      pipeline.sync
+      pipeline.sync()
 
       exec.get != null
     }

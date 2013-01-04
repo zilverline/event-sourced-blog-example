@@ -65,6 +65,6 @@ object Global extends GlobalSettings {
 
     val stop = DateTimeUtils.currentTimeMillis
     val elapsed = (stop - start) / 1000.0
-    Logger.info("Loaded memory image with %d commits in %.3f seconds (%.1f commits/second)".format(commitCount, elapsed, commitCount / elapsed))
+    Logger.info(f"Loaded memory image with $commitCount%d commits in $elapsed%.3f seconds (${commitCount / elapsed}%.1f commits/second)")
   }
 }

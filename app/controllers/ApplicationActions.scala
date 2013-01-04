@@ -1,11 +1,12 @@
 package controllers
 
-import events._
 import eventstore._
 import models._
 import play.api.mvc._
-import play.api.mvc.Results._
 
+/**
+ * Context for use as an implicit parameter to views.
+ */
 trait ViewContext extends CurrentUserContext {
   def flash: Flash
 }

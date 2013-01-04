@@ -38,14 +38,12 @@ object RedisEventStore {
 }
 
 /**
- * Defines the `reader` and `publisher` implementations for an `EventStore`. The committer implementations can be mixed in at instantiation time.
- *
  * The Redis event store implementation uses two primary data structures:
  *
  * - A hash containing all commits indexed by the store revision (commit id).
  * - A list of commit ids per event stream.
  *
- * Events most have an associated `Format` instance to allow for (de)serialization to JSON.
+ * Events must have an associated `Format` instance to allow for (de)serialization to JSON.
  */
 abstract class RedisEventStore[Event] protected (name: String, host: String, port: Int = RedisEventStore.DEFAULT_PORT, config: Config = new Config)(implicit val eventFormat: Format[Event]) extends EventStore[Event] {
 
@@ -225,5 +223,5 @@ abstract class RedisEventStore[Event] protected (name: String, host: String, por
     jedisPool.destroy
   }
 
-  override def toString = "RedisEventStore(%s, %s:%d)".format(name, host, port)
+  override def toString = s"RedisEventStore($name, $host:$port)"
 }
