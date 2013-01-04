@@ -11,32 +11,6 @@ import play.api.libs.json._
 import _root_.redis.clients.jedis._
 import scala.collection.JavaConverters._
 
-object RedisEventStore {
-  val DEFAULT_PORT = Protocol.DEFAULT_PORT
-
-  def apply[Event: Format](name: String, host: String, port: Int = DEFAULT_PORT, config: Config = new Config, disableLua: Boolean = false): RedisEventStore[Event] = {
-    if (disableLua || !supportsLua(host, port)) {
-      Logger.warn("Redis Lua scripting is disabled or not supported, falling back to using WATCH/MULTI/EXEC.")
-      new RedisEventStore(name, host, port, config) with RedisWatchMultiExecEventCommitter[Event]
-    } else {
-      Logger.info("Redis Lua scripting is supported and enabled, using Lua event committer script.")
-      new RedisEventStore(name, host, port, config) with RedisLuaEventCommitter[Event]
-    }
-  }
-
-  private[this] def supportsLua(host: String, port: Int): Boolean = {
-    val jedis = new Jedis(host, port)
-    try {
-      // Detect if Redis suports Lua by trying to execute the SCRIPT EXISTS command.
-      jedis.scriptExists(); true
-    } catch {
-      case _: exceptions.JedisDataException => false
-    } finally {
-      jedis.disconnect()
-    }
-  }
-}
-
 /**
  * The Redis event store implementation uses two primary data structures:
  *
@@ -45,7 +19,7 @@ object RedisEventStore {
  *
  * Events must have an associated `Format` instance to allow for (de)serialization to JSON.
  */
-abstract class RedisEventStore[Event] protected (name: String, host: String, port: Int = RedisEventStore.DEFAULT_PORT, config: Config = new Config)(implicit val eventFormat: Format[Event]) extends EventStore[Event] {
+class RedisEventStore[Event: Format](name: String, host: String, port: Int = Protocol.DEFAULT_PORT, config: Config = new Config) extends EventStore[Event] {
 
   // Each event store has its own namespace in Redis, based on the event store name.
   protected[this] val KeyPrefix = name + ":"
@@ -115,6 +89,62 @@ abstract class RedisEventStore[Event] protected (name: String, host: String, por
     override def readStream[StreamId, E <: Event](streamId: StreamId, since: StreamRevision = StreamRevision.Initial, to: StreamRevision = StreamRevision.Maximum)(implicit descriptor: EventStreamType[StreamId, E]): Stream[Commit[E]] = {
       val commitIds = withJedis { _.lrange(keyForStream(descriptor.toString(streamId)), since.value, to.value) }
       doReadCommits(commitIds.asScala).map(commit => commit.copy(events = commit.events.map(descriptor.cast)))
+    }
+  }
+
+  override object committer extends EventCommitter[Event] {
+    private[this] val TryCommitScript: String = """
+      | local commitsKey = KEYS[1]
+      | local streamKey = KEYS[2]
+      | local timestamp = tonumber(ARGV[1])
+      | local streamId = ARGV[2]
+      | local expected = tonumber(ARGV[3])
+      | local events = ARGV[4]
+      | local headers = ARGV[5]
+      |
+      | local actual = tonumber(redis.call('llen', streamKey))
+      | if actual ~= expected then
+      |   return {'conflict', tostring(actual)}
+      | end
+      |
+      | local storeRevision = tonumber(redis.call('hlen', commitsKey))
+      | local commitId = storeRevision + 1
+      | local commitData = string.format('{"storeRevision":%d,"timestamp":%d,"streamId":%s,"streamRevision":%d,"events":%s,"headers":%s}',
+      |   commitId, timestamp, cjson.encode(streamId), actual + 1, events, headers)
+      |
+      | redis.call('hset', commitsKey, commitId, commitData)
+      | redis.call('rpush', streamKey, commitId)
+      | redis.call('publish', commitsKey, commitData)
+      |
+      | return {'commit', tostring(commitId)}
+      """.stripMargin
+
+    private[this] val TryCommitScriptId = withJedis { _.scriptLoad(TryCommitScript) }
+    Logger.debug("Redis Lua TryCommitScript loaded with id " + TryCommitScriptId)
+
+    override def tryCommit[E <: Event](changes: Changes[E]): CommitResult[E] = {
+      implicit val descriptor = changes.eventStreamType
+      val timestamp = DateTimeUtils.currentTimeMillis
+      val serializedEvents = Json.stringify(Json.toJson(changes.events))
+      val serializedHeaders = Json.stringify(Json.toJson(changes.headers))
+      val streamId = descriptor.toString(changes.streamId)
+      val response = withJedis { _.evalsha(TryCommitScriptId, 2,
+        /* KEYS */ CommitsKey, keyForStream(streamId),
+        /* ARGV */ timestamp.toString, streamId, changes.expected.value.toString, serializedEvents, serializedHeaders)
+      }
+
+      try {
+        response.asInstanceOf[java.util.List[_]].asScala match {
+          case Seq("conflict", actual: String) =>
+            val conflicting = reader.readStream(changes.streamId, since = changes.expected)
+            Left(Conflict(conflicting.flatMap(_.committedEvents)))
+          case Seq("commit", storeRevision: String) =>
+            Right(Commit(StoreRevision(storeRevision.toLong), timestamp, streamId, changes.expected.next, changes.events, changes.headers))
+        }
+      } catch {
+        case e: Exception =>
+          throw new EventStoreException("Error parsing response from Redis TryCommit script: " + response, e)
+      }
     }
   }
 

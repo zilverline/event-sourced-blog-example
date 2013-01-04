@@ -2,9 +2,7 @@ package controllers
 
 import events._
 import eventstore._, Transaction._
-import models._
 import play.api.mvc.Results._
-import play.api.test._
 import play.api.test.Helpers._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])

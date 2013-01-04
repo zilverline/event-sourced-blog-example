@@ -3,8 +3,6 @@ package controllers
 import play.api.test._
 import play.api.test.Helpers._
 import events._
-import eventstore._
-import models._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
 class UsersControllerSpec extends org.specs2.mutable.Specification {
@@ -12,7 +10,6 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
   val email = EmailAddress("john@example.com")
   val displayName = "John Doe"
   val password = Password.fromPlainText("password")
-  val authenticationToken = AuthenticationToken.generate
 
   "users controller" should {
     "register a new user" in new fixture {
@@ -46,7 +43,7 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
         UserRegistered(userId, email, displayName, password): UserEvent,
         UserLoggedIn(userId, authenticationToken): UserEvent)
 
-      val response = subject.logOut(authenticated)
+      val response = subject.logOut(authenticatedRequest)
 
       status(response) must_== 303
       session(response) must beEmpty
@@ -58,7 +55,7 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
         UserRegistered(userId, email, displayName, password): UserEvent,
         UserLoggedIn(userId, authenticationToken): UserEvent)
 
-      val response = subject.changeProfile(authenticated.withFormUrlEncodedBody("displayName" -> "Updated"))
+      val response = subject.changeProfile(authenticatedRequest.withFormUrlEncodedBody("displayName" -> "Updated"))
 
       status(response) must_== 303
       changes must_== Seq(UserProfileChanged(userId, displayName = "Updated"))
@@ -70,7 +67,7 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
         UserRegistered(userId, email, displayName, password): UserEvent,
         UserLoggedIn(userId, authenticationToken): UserEvent)
 
-      val response = subject.changeEmailAddress(authenticated.withFormUrlEncodedBody("email" -> updated.value))
+      val response = subject.changeEmailAddress(authenticatedRequest.withFormUrlEncodedBody("email" -> updated.value))
 
       status(response) must_== 303
       changes must_== Seq(UserEmailAddressChanged(userId, EmailAddress("updated@example.com")))
@@ -80,8 +77,6 @@ class UsersControllerSpec extends org.specs2.mutable.Specification {
 
   trait fixture extends ControllerFixture {
     val claimedUserIds = collection.mutable.Map.empty[EmailAddress, UserId]
-
-    val authenticated = FakeRequest().withSession("authenticationToken" -> authenticationToken.toString)
 
     val subject = new UsersController(
       new MemoryImageActions(memoryImage).view(_.users),

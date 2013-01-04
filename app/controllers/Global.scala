@@ -8,7 +8,7 @@ import org.joda.time.DateTimeUtils
 import play.api._
 import play.api.libs.json._
 import play.api.Play.current
-import _root_.redis.clients.jedis.Jedis
+import _root_.redis.clients.jedis.{Protocol, Jedis}
 import support.RedisEmailRegistry
 
 object Global extends GlobalSettings {
@@ -25,11 +25,10 @@ object Global extends GlobalSettings {
         jedisConfig.minIdle = config.getInt("redis.connection-pool-size").getOrElse(8)
         jedisConfig.maxIdle = jedisConfig.minIdle
         jedisConfig.maxActive = jedisConfig.minIdle
-        redis.RedisEventStore[DomainEvent](
+        new redis.RedisEventStore[DomainEvent](
           config.getString("redis.prefix").getOrElse(throw config.globalError("missing key [eventstore.redis.prefix]")),
           config.getString("redis.host").getOrElse(throw config.globalError("missing key [eventstore.redis.host]")),
-          config.getInt("redis.port").getOrElse(redis.RedisEventStore.DEFAULT_PORT),
-          disableLua = config.getBoolean("redis.disable-lua").getOrElse(false),
+          config.getInt("redis.port").getOrElse(Protocol.DEFAULT_PORT),
           config = jedisConfig)
     }
 
@@ -42,7 +41,7 @@ object Global extends GlobalSettings {
     val config = Play.configuration.getConfig("email-registry").getOrElse(throw Play.configuration.globalError("missing [email-registry] configuration"))
 
     val redisHost = config.getString("redis.host").getOrElse(throw config.globalError("missing key [email-registry.redis.host]"))
-    val redisPort = config.getInt("redis.port").getOrElse(redis.RedisEventStore.DEFAULT_PORT)
+    val redisPort = config.getInt("redis.port").getOrElse(Protocol.DEFAULT_PORT)
     val redisKey = config.getString("redis.key").getOrElse(throw config.globalError("missing key [email-registry.redis.key]"))
 
     val jedis = new Jedis(redisHost, redisPort)
