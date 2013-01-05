@@ -35,7 +35,7 @@ class UsersController(actions: ApplicationActions[Users, UserEvent], registerEma
             onCommit = Redirect(routes.UsersController.loggedIn).withSession("authenticationToken" -> token.toString),
             onConflict = unexpectedConflict)
       } getOrElse {
-        abort(BadRequest(views.html.users.logIn(form.addError(FormError("", "bad.credentials")))))
+        abort(BadRequest(views.html.users.logIn(form.withGlobalError("bad.credentials"))))
       })
   }
 
@@ -75,7 +75,7 @@ class UsersController(actions: ApplicationActions[Users, UserEvent], registerEma
         val userId = registerEmailAddress(email, UserId.generate)
         Changes(StreamRevision.Initial, UserRegistered(userId, email, displayName, password): UserEvent).commit(
           onCommit = Redirect(routes.UsersController.registered),
-          onConflict = _ => BadRequest(views.html.users.register(form.addError(FormError("", "duplicate.account")))))
+          onConflict = _ => BadRequest(views.html.users.register(form.withGlobalError("duplicate.account"))))
       })
   }
 
