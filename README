@@ -1,16 +1,16 @@
-Example blog application using event sourcing, memory image, and Play! 2.0 with Scala
+Example blog application using event sourcing, memory image, and Play! 2.1 with Scala
 =====================================================================================
 
 See http://blog.zilverline.com/2012/07/04/simple-event-sourcing-introduction-part-1/
 for the accompanying blog series.
 
-To run the application install play-2.0.3 (or later) and run "play".
+To run the application install play-2.1-RC1 (or later) and run "play".
 
 Or install sbt 0.11.3 (or later) and run "sbt".
 
 To start the server with the Redis (http://redis.io) event store implementation you
-will need to have a Redis instance running. Redis 2.4 or higher should work fine,
-Redis 2.6 is preferred. You can change the connection settings in conf/application.conf.
+will need to have a Redis instance running. Redis 2.6 or higher is required. You can
+change the connection settings in conf/application.conf.
 
 Now you can execute "play run" (or "sbt run") to start the server. First time the
 internet is downloaded, but after a while you should be able to browse to
