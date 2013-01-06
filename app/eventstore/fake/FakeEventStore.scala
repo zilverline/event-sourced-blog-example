@@ -107,6 +107,7 @@ class FakeEventStore[Event] extends EventStore[Event] {
     executor.shutdown
     if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
       executor.shutdownNow
+      ()
     }
   }
 }

@@ -153,6 +153,7 @@ object PerformanceTest extends App {
     if (!executor.awaitTermination(1, TimeUnit.HOURS)) {
       println("Timeout awaiting shutdown of executor.")
       executor.shutdownNow
+      ()
     }
   }
 

@@ -18,6 +18,7 @@ object ApplicationBuild extends Build {
 
   val main = play.Project(appName, appVersion, appDependencies).settings(
     scalaVersion := "2.10.0",
+    scalacOptions := Seq("-deprecation", "-unchecked", "-Ywarn-value-discard", "-Ywarn-adapted-args"),
     routesImport ++= Seq("events._", "eventstore.{ StoreRevision, StreamRevision }", "support.Binders._"),
 
     templatesImport ++= Seq("events._", "eventstore.{ StoreRevision, StreamRevision }"),

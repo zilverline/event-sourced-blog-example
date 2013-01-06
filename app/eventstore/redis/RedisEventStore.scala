@@ -225,6 +225,7 @@ class RedisEventStore[Event: Format](name: String, host: String, port: Int = Pro
         override def cancel() = {
           cancelled = true
           withJedis { _.publish(ControlChannel, unsubscribeToken) }
+          ()
         }
 
         override def toString = s"Subscription($last, $cancelled, ${RedisEventStore.this})"
