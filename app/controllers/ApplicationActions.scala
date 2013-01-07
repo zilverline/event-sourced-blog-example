@@ -14,9 +14,8 @@ trait ViewContext extends CurrentUserContext {
 /**
  * Extend Play's `Request` with user context information.
  */
-trait ApplicationRequestHeader extends RequestHeader with ViewContext with UsersContext
 class ApplicationRequest[A](val currentUser: User, val users: Users, request: Request[A])
-  extends WrappedRequest(request) with ApplicationRequestHeader
+  extends WrappedRequest(request) with ViewContext with UsersContext
 
 /**
  * Actions available to a controller that makes use of a memory image.
