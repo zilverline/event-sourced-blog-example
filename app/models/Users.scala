@@ -22,6 +22,10 @@ trait UsersContext {
 sealed trait User {
   def displayName: String
 
+  /**
+   * @return `Some(registeredUser)` if this is a registered user,
+   *         `None` otherwise.
+   */
   def registered: Option[RegisteredUser] = None
 
   def canAddPost: Boolean = false
@@ -42,7 +46,7 @@ case class UnknownUser(id: UserId) extends User {
 
 /**
  * A user that we know the name of, but nothing else. Consider a comment posted
- * by a guest (where they have to specify the name).
+ * by a guest (where they only have to specify their name).
  */
 case class PseudonymousUser(displayName: String) extends User
 
@@ -115,14 +119,14 @@ case class Users(
 
   def get(id: UserId): Option[RegisteredUser] = byId.get(id)
 
-  def withEmail(email: EmailAddress): Option[RegisteredUser] =
+  def findByEmail(email: EmailAddress): Option[RegisteredUser] =
     byEmail.get(email).flatMap(get)
 
-  def withAuthenticationToken(token: AuthenticationToken): Option[RegisteredUser] =
+  def findByAuthenticationToken(token: AuthenticationToken): Option[RegisteredUser] =
     byAuthenticationToken.get(token).flatMap(get)
 
   def authenticate(email: EmailAddress, password: String): Option[(RegisteredUser, AuthenticationToken)] =
-    withEmail(email).filter(_.password.verify(password)).map { (_, AuthenticationToken.generate) }
+    findByEmail(email).filter(_.password.verify(password)).map { (_, AuthenticationToken.generate) }
 
   def update(event: UserEvent, revision: StreamRevision): Users = event match {
     case UserRegistered(userId, email, displayName, password) =>

@@ -33,25 +33,25 @@ class UsersSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
 
     "track users by initial email address" in {
       val users = given(UserRegistered(A, emailAddress, displayName, password)).users
-      users.withEmail(emailAddress) must beSome(RegisteredUser(A, StreamRevision(1), emailAddress, displayName, password))
+      users.findByEmail(emailAddress) must beSome(RegisteredUser(A, StreamRevision(1), emailAddress, displayName, password))
     }
 
     "track users by changed email address" in {
       val updated = EmailAddress("updated@example.com")
       val users = given(UserRegistered(A, emailAddress, displayName, password), UserEmailAddressChanged(A, updated)).users
-      users.withEmail(emailAddress) must beNone
-      users.withEmail(updated) must beSome(RegisteredUser(A, StreamRevision(2), updated, displayName, password))
+      users.findByEmail(emailAddress) must beNone
+      users.findByEmail(updated) must beSome(RegisteredUser(A, StreamRevision(2), updated, displayName, password))
     }
 
     "track current authentication token when logged in" in {
       val users = given(UserRegistered(A, emailAddress, displayName, password), UserLoggedIn(A, authenticationToken)).users
-      users.withAuthenticationToken(authenticationToken) must beSome(RegisteredUser(A, StreamRevision(2), emailAddress, displayName, password, Some(authenticationToken)))
+      users.findByAuthenticationToken(authenticationToken) must beSome(RegisteredUser(A, StreamRevision(2), emailAddress, displayName, password, Some(authenticationToken)))
     }
 
     "remove current authentication token logged out" in {
       val users = given(UserRegistered(A, emailAddress, displayName, password), UserLoggedIn(A, authenticationToken), UserLoggedOut(A)).users
 
-      users.withAuthenticationToken(authenticationToken) must beNone
+      users.findByAuthenticationToken(authenticationToken) must beNone
       users.get(A) must beSome(RegisteredUser(A, StreamRevision(3), emailAddress, displayName, password, None))
     }
 
@@ -61,8 +61,8 @@ class UsersSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCh
         UserLoggedIn(A, authenticationToken),
         UserLoggedIn(A, authenticationToken2)).users
 
-      users.withAuthenticationToken(authenticationToken) must beNone
-      users.withAuthenticationToken(authenticationToken2) must beSome(RegisteredUser(A, StreamRevision(3), emailAddress, displayName, password, Some(authenticationToken2)))
+      users.findByAuthenticationToken(authenticationToken) must beNone
+      users.findByAuthenticationToken(authenticationToken2) must beSome(RegisteredUser(A, StreamRevision(3), emailAddress, displayName, password, Some(authenticationToken2)))
     }
 
     "track the stream revision per user" in eventsForMultipleUsers { events =>

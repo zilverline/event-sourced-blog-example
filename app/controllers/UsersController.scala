@@ -16,11 +16,6 @@ class UsersController(actions: ApplicationActions[Users, UserEvent], registerEma
 
   private def unexpectedConflict(conflict: Conflict[UserEvent]) = InternalServerError
 
-  private val confirmedPassword: Mapping[Password] =
-    tuple("1" -> password.verifying(minLength(8)), "2" -> password)
-      .verifying("error.password.mismatch", fields => fields._1 == fields._2)
-      .transform(fields => Password.fromPlainText(fields._1), _ => ("", ""))
-
   private val loginForm = Form(tuple("email" -> emailAddress, "password" -> password))
 
   def showLogIn = ApplicationAction { implicit request => Ok(views.html.users.logIn(loginForm)) }
@@ -56,6 +51,10 @@ class UsersController(actions: ApplicationActions[Users, UserEvent], registerEma
   /**
    * Registration form.
    */
+  private val confirmedPassword: Mapping[Password] =
+    tuple("1" -> password.verifying(minLength(8)), "2" -> password)
+      .verifying("error.password.mismatch", fields => fields._1 == fields._2)
+      .transform(fields => Password.fromPlainText(fields._1), _ => ("", ""))
   private val registrationForm: Form[(EmailAddress, String, Password)] = Form(tuple(
     "email" -> emailAddress,
     "displayName" -> tokenizedText.verifying(minLength(2)),

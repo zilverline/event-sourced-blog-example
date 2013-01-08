@@ -34,7 +34,7 @@ trait ControllerFixture extends Around {
   given(
     UserRegistered(currentUserId, EmailAddress("joe@example.com"), "Joe", ControllerFixture.password): UserEvent,
     UserLoggedIn(currentUserId, authenticationToken))
-  val registeredUser = memoryImage.get.users.withAuthenticationToken(authenticationToken) getOrElse (sys.error("user not authenticated"))
+  val registeredUser = memoryImage.get.users.findByAuthenticationToken(authenticationToken) getOrElse (sys.error("user not authenticated"))
 
   def unauthenticatedRequest = FakeRequest()
   def authenticatedRequest = FakeRequest().withSession("authenticationToken" -> authenticationToken.toString)

@@ -12,27 +12,29 @@ import play.api.mvc._
 class MemoryImageActions(memoryImage: MemoryImage[ApplicationState, DomainEvent])
     extends ApplicationActions[ApplicationState, DomainEvent] {
 
-  def QueryAction(block: QueryBlock[AnyContent]): Action[AnyContent] = Action { implicit request =>
+  override def QueryAction(block: QueryBlock[AnyContent]) = Action { request =>
     val state = memoryImage.get
-    block(state)(buildApplicationRequest(state))
+    block(state)(buildApplicationRequest(request, state))
   }
 
-  def CommandAction(block: CommandBlock[AnyContent]) = Action { implicit request =>
+  override def CommandAction(block: CommandBlock[AnyContent]) = Action { request =>
     memoryImage.modify { state =>
-      val applicationRequest = buildApplicationRequest(state)
+      val applicationRequest = buildApplicationRequest(request, state)
       val currentUser = applicationRequest.currentUser
       val transaction = block(state)(applicationRequest)
       if (transaction.events.forall(currentUser.authorizeEvent(state))) {
         transaction.withHeaders(currentUser.registered.map(user => "currentUserId" -> user.id.toString).toSeq: _*)
       } else {
-        Transaction.abort(notFound)
+        Transaction.abort(notFound(request))
       }
     }
   }
 
-  private def buildApplicationRequest[A](state: ApplicationState)(implicit request: Request[A]): ApplicationRequest[A] = {
-    val authenticationToken = request.session.get("authenticationToken").flatMap(AuthenticationToken.fromString)
-    val authenticatedUser = authenticationToken.flatMap(state.users.withAuthenticationToken)
-    new ApplicationRequest(authenticatedUser getOrElse GuestUser, state.users, request)
+  private def buildApplicationRequest[A](request: Request[A], state: ApplicationState) = {
+    val currentUser = request.session.get("authenticationToken")
+      .flatMap(AuthenticationToken.fromString)
+      .flatMap(state.users.findByAuthenticationToken)
+      .getOrElse(GuestUser)
+    new ApplicationRequest(request, currentUser, state.users)
   }
 }
