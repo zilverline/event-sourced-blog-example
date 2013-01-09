@@ -20,7 +20,7 @@ class ApplicationRequest[A](request: Request[A], val currentUser: User, val user
 /**
  * Actions available to a controller that makes use of a memory image.
  */
-trait ApplicationActions[State, -Event] extends Controller { outer =>
+trait ControllerActions[State, -Event] extends Controller { outer =>
   /**
    * The type of blocks that only need to query the current state of the memory image.
    */
@@ -78,7 +78,7 @@ trait ApplicationActions[State, -Event] extends Controller { outer =>
   /**
    * Only expose part of the state of the memory image using the provided function `f`.
    */
-  def view[S, E <: Event](f: State => S): ApplicationActions[S, E] = new ApplicationActions[S, E] {
+  def view[S, E <: Event](f: State => S): ControllerActions[S, E] = new ControllerActions[S, E] {
     def QueryAction(block: QueryBlock[AnyContent]) = outer.QueryAction { state => request =>
       block(f(state))(request)
     }

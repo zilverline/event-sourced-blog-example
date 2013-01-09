@@ -11,7 +11,7 @@ import play.api.i18n.Messages
 import support.Forms._
 
 object PostsController extends PostsController(Global.MemoryImageActions.view(_.posts))
-class PostsController(actions: ApplicationActions[Posts, PostEvent]) {
+class PostsController(actions: ControllerActions[Posts, PostEvent]) {
   import actions._
 
   /**

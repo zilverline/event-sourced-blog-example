@@ -11,7 +11,7 @@ import play.api.i18n.Messages
 import support.Forms._
 
 object UsersController extends UsersController(Global.MemoryImageActions.view(_.users), Global.emailAddressRegistry.claim)
-class UsersController(actions: ApplicationActions[Users, UserEvent], registerEmailAddress: (EmailAddress, UserId) => UserId) {
+class UsersController(actions: ControllerActions[Users, UserEvent], registerEmailAddress: (EmailAddress, UserId) => UserId) {
   import actions._
 
   private def unexpectedConflict(conflict: Conflict[UserEvent]) = InternalServerError

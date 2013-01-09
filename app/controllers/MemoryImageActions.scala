@@ -6,11 +6,11 @@ import models._
 import play.api.mvc._
 
 /**
- * Implements `ApplicationActions` using the (global) memory image containing the
+ * Implements `ControllerActions` using the (global) memory image containing the
  * `ApplicationState`.
  */
 class MemoryImageActions(memoryImage: MemoryImage[ApplicationState, DomainEvent])
-    extends ApplicationActions[ApplicationState, DomainEvent] {
+    extends ControllerActions[ApplicationState, DomainEvent] {
 
   override def QueryAction(block: QueryBlock[AnyContent]) = Action { request =>
     val state = memoryImage.get
