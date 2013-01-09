@@ -11,7 +11,7 @@ import play.api.i18n.Messages
 import support.Forms._
 
 object UsersController extends UsersController(Global.MemoryImageActions.view(_.users), Global.emailAddressRegistry.claim)
-class UsersController(actions: ControllerActions[Users, UserEvent], registerEmailAddress: (EmailAddress, UserId) => UserId) {
+class UsersController(actions: ControllerActions[Users, UserEvent], claimEmailAddress: (EmailAddress, UserId) => UserId) {
   import actions._
 
   private def unexpectedConflict(conflict: Conflict[UserEvent]) = InternalServerError
@@ -71,7 +71,7 @@ class UsersController(actions: ControllerActions[Users, UserEvent], registerEmai
         abort(BadRequest(views.html.users.register(formWithErrors))),
       registration => {
         val (email, displayName, password) = registration
-        val userId = registerEmailAddress(email, UserId.generate)
+        val userId = claimEmailAddress(email, UserId.generate)
         Changes(StreamRevision.Initial, UserRegistered(userId, email, displayName, password): UserEvent).commit(
           onCommit = Redirect(routes.UsersController.registered),
           onConflict = _ => BadRequest(views.html.users.register(form.withGlobalError("duplicate.account"))))
@@ -87,7 +87,7 @@ class UsersController(actions: ControllerActions[Users, UserEvent], registerEmai
 
   private def changeEmailForm(implicit user: RegisteredUser) =
     Form(single("email" -> emailAddress.verifying("value.unchanged", _ != user.email))
-      .verifying("duplicate.account", email => registerEmailAddress(email, user.id) == user.id))
+      .verifying("duplicate.account", email => claimEmailAddress(email, user.id) == user.id))
       .fill(user.email)
 
   private def changePasswordForm(implicit user: RegisteredUser) =
