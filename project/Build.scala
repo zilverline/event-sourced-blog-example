@@ -17,7 +17,6 @@ object ApplicationBuild extends Build {
     "org.scalacheck" %% "scalacheck" % "1.10.0" % "test")
 
   val main = play.Project(appName, appVersion, appDependencies).settings(
-    scalaVersion := "2.10.0",
     scalacOptions := Seq("-deprecation", "-unchecked", "-Ywarn-value-discard", "-Ywarn-adapted-args"),
     routesImport ++= Seq("events._", "eventstore.{ StoreRevision, StreamRevision }", "support.Binders._"),
 
