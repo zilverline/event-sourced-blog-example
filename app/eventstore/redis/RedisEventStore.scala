@@ -19,41 +19,25 @@ import scala.collection.JavaConverters._
  *
  * Events must have an associated `Format` instance to allow for (de)serialization to JSON.
  */
-class RedisEventStore[Event: Format](name: String, host: String, port: Int = Protocol.DEFAULT_PORT, config: Config = new Config) extends EventStore[Event] {
-
-  // Each event store has its own namespace in Redis, based on the event store name.
-  protected[this] val KeyPrefix = name + ":"
+class RedisEventStore[Event: Format](val name: String)(implicit val jedisPool: JedisPool) extends EventStore[Event] with messaging.redis.RedisSupport {
 
   // Redis key for the commits hash. Also used as commits publication channel for subscribers.
-  protected[this] val CommitsKey: String = KeyPrefix + "commits"
-
-  protected[this] val StreamKeyPrefix: String = KeyPrefix + "stream:"
+  protected[this] val CommitsKey: String = s"$name:commits"
 
   // Redis key for the list of commit ids per event stream.
-  protected[this] def keyForStream(streamId: String): String = StreamKeyPrefix + streamId
+  protected[this] def keyForStream(streamId: String): String = s"$name:stream:$streamId"
 
   // Executor for event store subscribers. Each subscriber gets its own thread.
   private[this] val executor = Executors.newCachedThreadPool
 
   // Subscriber control channel for handling event store closing and subscription cancellation.
-  private[this] val ControlChannel: String = KeyPrefix + "control"
+  private[this] val ControlChannel: String = s"$name:control"
+
+  private[this] val DispatchQueuesKey: String = s"$name:dispatchQueues"
 
   // Control message used to notify subscribers the event store is closing.
   private[this] val CloseToken = UUID.randomUUID.toString
   @volatile private[this] var closed = false
-
-  // Redis connection pool for readers and committers. Subscribers do not use this pool.
-  private[this] val jedisPool = new JedisPool(config, host, port)
-
-  // Execute a Redis command with a connection from the pool.
-  protected[this] def withJedis[A](f: Jedis => A): A = {
-    val jedis = jedisPool.getResource
-    try {
-      f(jedis)
-    } finally {
-      jedisPool.returnResource(jedis: BinaryJedis)
-    }
-  }
 
   // Maximum number of commits to read at one time.
   private[this] val ChunkSize = 10000
@@ -65,6 +49,19 @@ class RedisEventStore[Event: Format](name: String, host: String, port: Int = Pro
       val serializedCommits = withJedis { _.hmget(CommitsKey, chunk: _*) }
       serializedCommits.asScala.par.map(deserializeCommit)
     }.toStream
+  }
+
+  /**
+   * Adds a queue to push commit ids to when events are committed.
+   */
+  def addDispatchQueue(name: String): Unit = {
+    withJedis { _.sadd(DispatchQueuesKey, name) }
+    ()
+  }
+
+  def removeDispatchQueue(name: String): Unit = {
+    withJedis { _.srem(DispatchQueuesKey, name) }
+    ()
   }
 
   // Helpers to serialize and deserialize commits.
@@ -93,9 +90,10 @@ class RedisEventStore[Event: Format](name: String, host: String, port: Int = Pro
   }
 
   override object committer extends EventCommitter[Event] {
-    private[this] val TryCommitScript: String = """
+    private[this] object TryCommitScript extends LuaScript("""
       | local commitsKey = KEYS[1]
       | local streamKey = KEYS[2]
+      | local dispatchQueuesKey = KEYS[3]
       | local timestamp = tonumber(ARGV[1])
       | local streamId = ARGV[2]
       | local expected = tonumber(ARGV[3])
@@ -116,11 +114,12 @@ class RedisEventStore[Event: Format](name: String, host: String, port: Int = Pro
       | redis.call('rpush', streamKey, commitId)
       | redis.call('publish', commitsKey, commitData)
       |
+      | for _, queueKey in ipairs(redis.call('smembers', dispatchQueuesKey)) do
+      |   redis.call('lpush', queueKey, commitId)
+      | end
+      |
       | return {'commit', tostring(commitId)}
-      """.stripMargin
-
-    private[this] val TryCommitScriptId = withJedis { _.scriptLoad(TryCommitScript) }
-    Logger.debug("Redis Lua TryCommitScript loaded with id " + TryCommitScriptId)
+      """.stripMargin)
 
     override def tryCommit[E <: Event](changes: Changes[E]): CommitResult[E] = {
       implicit val descriptor = changes.eventStreamType
@@ -128,10 +127,9 @@ class RedisEventStore[Event: Format](name: String, host: String, port: Int = Pro
       val serializedEvents = Json.stringify(Json.toJson(changes.events))
       val serializedHeaders = Json.stringify(Json.toJson(changes.headers))
       val streamId = descriptor.toString(changes.streamId)
-      val response = withJedis { _.evalsha(TryCommitScriptId, 2,
-        /* KEYS */ CommitsKey, keyForStream(streamId),
-        /* ARGV */ timestamp.toString, streamId, changes.expected.value.toString, serializedEvents, serializedHeaders)
-      }
+      val response = TryCommitScript.eval(
+        CommitsKey, keyForStream(streamId), DispatchQueuesKey)(
+        timestamp.toString, streamId, changes.expected.value.toString, serializedEvents, serializedHeaders)
 
       try {
         response.asInstanceOf[java.util.List[_]].asScala match {
@@ -212,11 +210,11 @@ class RedisEventStore[Event: Format](name: String, host: String, port: Int = Pro
             replayCommitsTo(currentRevision)
           }
 
-          val jedis = new Jedis(host, port)
+          val jedis = jedisPool.getResource
           try {
             jedis.subscribe(Subscriber, ControlChannel, CommitsKey)
           } finally {
-            jedis.disconnect
+            jedisPool.returnBrokenResource(jedis: BinaryJedis)
           }
         }
       })
@@ -237,7 +235,7 @@ class RedisEventStore[Event: Format](name: String, host: String, port: Int = Pro
    * Deletes all data from the event store. Use carefully!
    */
   def truncate_!(): Unit = withJedis { jedis: BinaryJedis =>
-    val keys = jedis.keys((KeyPrefix + "*").getBytes("UTF-8"))
+    val keys = jedis.keys(s"$name:*".getBytes("UTF-8"))
     keys.asScala.grouped(ChunkSize).foreach { group => jedis.del(group.toArray: _*) }
   }
 
@@ -251,8 +249,8 @@ class RedisEventStore[Event: Format](name: String, host: String, port: Int = Pro
     if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
       executor.shutdownNow
     }
-    jedisPool.destroy
+    ()
   }
 
-  override def toString = s"RedisEventStore($name, $host:$port)"
+  override def toString = s"RedisEventStore($name)"
 }

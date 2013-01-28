@@ -17,7 +17,14 @@ object ApplicationBuild extends Build {
     "org.scalacheck" %% "scalacheck" % "1.10.0" % "test")
 
   val main = play.Project(appName, appVersion, appDependencies).settings(
-    scalacOptions := Seq("-deprecation", "-unchecked", "-Ywarn-value-discard", "-Ywarn-adapted-args"),
+    scalacOptions := Seq("-deprecation", "-feature", "-unchecked", "-Ywarn-value-discard", "-Ywarn-adapted-args"),
+
+    // Avoid running tests using both specs2 and junit runner.
+    testFrameworks in Test := Seq(TestFrameworks.Specs2),
+
+    // Override Play! defaults to enable parallel test execution
+    testOptions in Test := Seq(Tests.Argument(TestFrameworks.Specs2, "junitxml", "console")),
+
     routesImport ++= Seq("events._", "eventstore.{ StoreRevision, StreamRevision }", "support.Binders._"),
 
     templatesImport ++= Seq("events._", "eventstore.{ StoreRevision, StreamRevision }"),

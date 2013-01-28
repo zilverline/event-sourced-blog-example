@@ -6,6 +6,7 @@ import org.joda.time.DateTimeUtils
 import org.scalacheck._, Arbitrary.arbitrary, Prop.{ forAll, forAllNoShrink }
 import org.specs2.matcher.Matcher
 import play.api.libs.json._
+import scala.language.higherKinds
 
 object EventStoreSpec {
   private[this] implicit def arbitrarySeq[A: Arbitrary]: Arbitrary[Seq[A]] = Arbitrary(arbitrary[List[A]])
@@ -137,19 +138,19 @@ class CommitSpec extends org.specs2.mutable.Specification with org.specs2.ScalaC
   }
 }
 
-trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
+trait EventStoreSpec[ES[Event] <: EventStore[Event]] extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
   val streamIdGenerator = Gen.wrap(UUID.randomUUID.toString)
   implicit val StringEventStreamType: EventStreamType[String, String] = EventStreamType(identity, identity)
 
   def matchCommit[A] = (be_==(_: Commit[A])) ^^^ ((_:Commit[A]).copy(timestamp = 0))
 
-  "An event store" should {
+  def genericEventStoreExamples(emptyEventStore: => ES[String]) = {
     val id = Gen.alphaStr.sample.get
     val event = Gen.alphaStr.sample.get
     val event1 = Gen.alphaStr.sample.get
     val event2 = Gen.alphaStr.sample.get
 
-    "commit initial event to stream" in new fixture {
+    "commit initial event to stream" in new fixture(emptyEventStore) {
       val result = subject.committer.tryCommit(Changes(id, StreamRevision.Initial, event))
 
       result must beRight
@@ -158,7 +159,7 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
       subject.reader.storeRevision must_== StoreRevision.Initial.next
     }
 
-    "detect and return conflicting events" in new fixture {
+    "detect and return conflicting events" in new fixture(emptyEventStore) {
       subject.committer.tryCommit(Changes(id, StreamRevision.Initial, event1))
 
       val result = subject.committer.tryCommit(Changes(id, StreamRevision.Initial, event2))
@@ -173,7 +174,7 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
       commit.event must_== event1
     }
 
-    "store commits" in new fixture {
+    "store commits" in new fixture(emptyEventStore) {
       subject.committer.tryCommit(Changes("streamId", StreamRevision(0), "event").withHeaders("header" -> "value"))
 
       subject.reader.streamRevision("streamId") must_== StreamRevision(1)
@@ -182,7 +183,7 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
       commits(0) must matchCommit(Commit(StoreRevision(1), now, "streamId", StreamRevision(1), Seq("event"), Map("header" -> "value")))
     }
 
-    "store commits in multiple streams" in new fixture {
+    "store commits in multiple streams" in new fixture(emptyEventStore) {
       checkProp(forAll(Gen.listOf(streamIdGenerator)) { streamIds =>
         val startRevision = subject.reader.storeRevision
         for (streamId <- streamIds) {
@@ -195,14 +196,14 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
       })
     }
 
-    "not store conflicts" in new fixture {
+    "not store conflicts" in new fixture(emptyEventStore) {
       subject.committer.tryCommit(Changes(id, StreamRevision.Initial, event1))
       subject.committer.tryCommit(Changes(id, StreamRevision.Initial, event2))
 
       subject.reader.streamRevision(id) must_== StreamRevision(1)
     }
 
-    "notify subscriber of commits" in new fixture {
+    "notify subscriber of commits" in new fixture(emptyEventStore) {
       checkProp(forAllNoShrink(Gen.listOf(streamIdGenerator)) { streamIds =>
         val startRevision = subject.reader.storeRevision
 
@@ -222,7 +223,7 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
       })
     }
 
-    "replay commits when subscribing" in new fixture {
+    "replay commits when subscribing" in new fixture(emptyEventStore) {
       checkProp(forAllNoShrink(Gen.listOf(streamIdGenerator)) { streamIds =>
         val startRevision = subject.reader.storeRevision
 
@@ -244,12 +245,10 @@ trait EventStoreSpec extends org.specs2.mutable.Specification with org.specs2.Sc
     }
   }
 
-  def makeEmptyEventStore: EventStore[String]
-
-  trait fixture extends org.specs2.mutable.After {
+  class fixture(initialEventStore: ES[String]) extends org.specs2.mutable.After {
     val now = DateTimeUtils.currentTimeMillis
 
-    val subject = makeEmptyEventStore
+    def subject = initialEventStore
 
     def commitMany(streamIds: List[String]) {
       for (streamId <- streamIds) {

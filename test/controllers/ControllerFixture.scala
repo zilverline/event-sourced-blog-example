@@ -6,6 +6,7 @@ import models._
 import play.api.test._
 import org.specs2.mutable.Around
 import org.specs2.execute.Result
+import org.specs2.execute.AsResult
 
 object ControllerFixture {
   val password = Password.fromPlainText("password")
@@ -42,5 +43,5 @@ trait ControllerFixture extends Around {
   def commits: Stream[eventstore.Commit[DomainEvent]] = eventStore.reader.readCommits[DomainEvent](initialStoreRevision, StoreRevision.Maximum)
   def changes: Seq[DomainEvent] = commits.flatMap(_.events).toSeq
 
-  override def around[T <% Result](t: => T) = try Helpers.running(application)(t) finally eventStore.close
+  override def around[T: AsResult](t: => T) = try implicitly[AsResult[T]].asResult(Helpers.running(application)(t)) finally eventStore.close
 }
