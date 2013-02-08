@@ -11,9 +11,9 @@ import org.joda.time.DateTimeUtils
 import org.joda.time.Instant
 import akka.event.ActorEventBus
 import akka.event.LookupClassification
-import scala.util.Try
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import scala.util.Try
 
 sealed trait Protocol
 case class Process(messageId: String, timesOutAt: Instant) extends Protocol
@@ -24,11 +24,16 @@ case class ProcessingStarted(messageId: String, timesOutAt: Instant) extends Mon
 case class ProcessingTimedOut(messageId: String, timedOutAt: Instant) extends MonitoringProtocol
 case class ProcessingCompleted(messageId: String, completedAt: Instant) extends MonitoringProtocol
 
+object RedisQueue {
+  val NamePattern = "[A-Za-z0-9_-]+"
+}
 class RedisQueue(
   val name: String,
   val initialTimeout: FiniteDuration = 30.seconds)(
     process: String => Future[Unit])(implicit actorSystem: ActorSystem, val jedisPool: JedisPool)
     extends redis.RedisSupport {
+
+  require(name matches RedisQueue.NamePattern, s"queue name incorrect: $name")
 
   private val logger = Logger(classOf[RedisQueue])
 
@@ -134,10 +139,10 @@ class RedisQueue(
     TimedOutScript(new Instant())
   }
 
-  object ControlChannelListener extends JedisPubSub {
-    private val Started = "STARTED ([^ ]+) ([0-9]+)".r
-    private val Completed = "COMPLETED ([^ ]+) ([0-9]+)".r
-    private val TimedOut = "TIMEDOUT ([^ ]+) ([0-9]+)".r
+  object ControlChannelSubscriber extends JedisPubSub with RedisPubSubNoOps {
+    private val Started = s"STARTED (${RedisQueue.NamePattern}) ([0-9]+)".r
+    private val Completed = s"COMPLETED (${RedisQueue.NamePattern}) ([0-9]+)".r
+    private val TimedOut = s"TIMEDOUT (${RedisQueue.NamePattern}) ([0-9]+)".r
     override def onMessage(channel: String, message: String) = message match {
       case Started(messageId, timesOutAt) =>
         monitoring publish ProcessingStarted(messageId, new Instant(timesOutAt.toLong))
@@ -150,22 +155,10 @@ class RedisQueue(
       case message =>
         logger.warn(s"$name: bad control message: $message")
     }
-    override def onSubscribe(channel: String, subscribedChannels: Int) {}
-    override def onPMessage(pattern: String, channel: String, message: String) {}
-    override def onUnsubscribe(channel: String, subscribedChannels: Int) {}
-    override def onPSubscribe(pattern: String, subscribedChannels: Int) {}
-    override def onPUnsubscribe(pattern: String, subscribedChannels: Int) {}
   }
   future[Unit] {
-    blocking {
-      val jedis = jedisPool.getResource
-      try {
-        jedis.subscribe(ControlChannelListener, ControlChannel)
-      } finally {
-        jedisPool.returnBrokenResource(jedis: BinaryJedis)
-        shutdownLatch.countDown()
-      }
-    }
+    subscribeToChannels(ControlChannelSubscriber)(ControlChannel)
+    shutdownLatch.countDown()
   }
 
   def close() {

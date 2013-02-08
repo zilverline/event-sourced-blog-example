@@ -10,6 +10,7 @@ import play.api.Logger
 import play.api.libs.json._
 import _root_.redis.clients.jedis._
 import scala.collection.JavaConverters._
+import scala.concurrent._
 
 /**
  * The Redis event store implementation uses two primary data structures:
@@ -28,7 +29,7 @@ class RedisEventStore[Event: Format](val name: String)(implicit val jedisPool: J
   protected[this] def keyForStream(streamId: String): String = s"$name:stream:$streamId"
 
   // Executor for event store subscribers. Each subscriber gets its own thread.
-  private[this] val executor = Executors.newCachedThreadPool
+  private[this] implicit val executionContext = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool)
 
   // Subscriber control channel for handling event store closing and subscription cancellation.
   private[this] val ControlChannel: String = s"$name:control"
@@ -154,70 +155,58 @@ class RedisEventStore[Event: Format](val name: String)(implicit val jedisPool: J
       @volatile var last = since
       val unsubscribeToken = UUID.randomUUID.toString
 
-      executor.execute(new Runnable {
-        private def replayCommitsTo(to: StoreRevision) {
-          if (last < to) {
-            Logger.info("Replaying commits since " + last + " to " + to)
-            readCommits(last, to).takeWhile(_ => !closed && !cancelled).foreach(listener)
-            last = to
-          }
+      def replayCommitsTo(to: StoreRevision) {
+        if (last < to) {
+          Logger.info("Replaying commits since " + last + " to " + to)
+          readCommits(last, to).takeWhile(_ => !closed && !cancelled).foreach(listener)
+          last = to
+        }
+      }
+
+      object Subscriber extends JedisPubSub with RedisPubSubNoOps {
+        override def onSubscribe(channel: String, subscribedChannels: Int) = channel match {
+          case ControlChannel =>
+            // We may have missed the cancellation token while subscribing, so check the flag.
+            if (closed || cancelled) unsubscribe
+          case CommitsKey =>
+            // We may have missed some commits while subscribing, so replay missing if needed.
+            replayCommitsTo(storeRevision)
+          case _ =>
+            Logger.warn("message received on unknown channel '" + channel + "'")
         }
 
-        private object Subscriber extends JedisPubSub {
-          override def onSubscribe(channel: String, subscribedChannels: Int) = channel match {
-            case ControlChannel =>
-              // We may have missed the cancellation token while subscribing, so check the flag.
-              if (closed || cancelled) unsubscribe
-            case CommitsKey =>
-              // We may have missed some commits while subscribing, so replay missing if needed.
-              replayCommitsTo(storeRevision)
-            case _ =>
-              Logger.warn("message received on unknown channel '" + channel + "'")
-          }
-
-          override def onMessage(channel: String, message: String) = channel match {
-            case ControlChannel =>
-              if (message == CloseToken || message == unsubscribeToken) {
-                unsubscribe
-              }
-            case CommitsKey =>
-              val commit = deserializeCommit(message)
-              if (last.next < commit.storeRevision) {
-                Logger.warn("missing commits since " + last + " to " + commit.storeRevision + ", replaying...")
-                replayCommitsTo(commit.storeRevision)
-              } else if (last.next == commit.storeRevision) {
-                listener(commit.withOnlyEventsOfType[E])
-                last = commit.storeRevision
-              } else {
-                Logger.warn("Ignoring old commit " + commit.storeRevision + ", since we already processed everything up to " + last)
-              }
-            case _ =>
-              Logger.warn("message received on unknown channel '" + channel + "'")
-          }
-
-          override def onPMessage(pattern: String, channel: String, message: String) {}
-          override def onUnsubscribe(channel: String, subscribedChannels: Int) {}
-          override def onPSubscribe(pattern: String, subscribedChannels: Int) {}
-          override def onPUnsubscribe(pattern: String, subscribedChannels: Int) {}
+        override def onMessage(channel: String, message: String) = channel match {
+          case ControlChannel =>
+            if (message == CloseToken || message == unsubscribeToken) {
+              unsubscribe
+            }
+          case CommitsKey =>
+            val commit = deserializeCommit(message)
+            if (last.next < commit.storeRevision) {
+              Logger.warn("missing commits since " + last + " to " + commit.storeRevision + ", replaying...")
+              replayCommitsTo(commit.storeRevision)
+            } else if (last.next == commit.storeRevision) {
+              listener(commit.withOnlyEventsOfType[E])
+              last = commit.storeRevision
+            } else {
+              Logger.warn("Ignoring old commit " + commit.storeRevision + ", since we already processed everything up to " + last)
+            }
+          case _ =>
+            Logger.warn("message received on unknown channel '" + channel + "'")
         }
+      }
 
-        override def run {
-          val currentRevision = storeRevision
-          if (last > currentRevision) {
-            Logger.warn("Last " + last + " is in the future, resetting it to current " + currentRevision)
-            last = currentRevision
-          } else {
-            replayCommitsTo(currentRevision)
-          }
+      val currentRevision = storeRevision
+      if (last > currentRevision) {
+        Logger.warn("Last " + last + " is in the future, resetting it to current " + currentRevision)
+        last = currentRevision
+      } else {
+        replayCommitsTo(currentRevision)
+      }
 
-          val jedis = jedisPool.getResource
-          try {
-            jedis.subscribe(Subscriber, ControlChannel, CommitsKey)
-          } finally {
-            jedisPool.returnBrokenResource(jedis: BinaryJedis)
-          }
-        }
-      })
+      future[Unit] {
+        subscribeToChannels(Subscriber)(ControlChannel, CommitsKey)
+      }
 
       new Subscription {
         override def cancel() = {
@@ -245,9 +234,9 @@ class RedisEventStore[Event: Format](val name: String)(implicit val jedisPool: J
   def close(): Unit = {
     closed = true
     withJedis { _.publish(ControlChannel, CloseToken) }
-    executor.shutdown
-    if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-      executor.shutdownNow
+    executionContext.shutdown()
+    if (!executionContext.awaitTermination(5, TimeUnit.SECONDS)) {
+      executionContext.shutdownNow
     }
     ()
   }
