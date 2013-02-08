@@ -39,6 +39,7 @@ object Global extends GlobalSettings {
           Logger.debug(s"Received $messageId for processing")
           Future.successful(())
         })
+        queue.startProcessing
         es.addDispatchQueue(queue.IncomingQueueKey)
         es
     }

@@ -28,7 +28,7 @@ trait RedisSupport {
     }
   }
 
-  protected[this] def subscribeToChannels(jedisPubSub: JedisPubSub)(channels: String*): Unit = blocking {
+  protected[this] def subscribeToChannels(channels: String*)(jedisPubSub: JedisPubSub): Unit = blocking {
     val jedis = jedisPool.getResource
     try {
       jedis.subscribe(jedisPubSub, channels: _*)

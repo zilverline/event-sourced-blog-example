@@ -205,7 +205,7 @@ class RedisEventStore[Event: Format](val name: String)(implicit val jedisPool: J
       }
 
       future[Unit] {
-        subscribeToChannels(Subscriber)(ControlChannel, CommitsKey)
+        subscribeToChannels(ControlChannel, CommitsKey)(Subscriber)
       }
 
       new Subscription {

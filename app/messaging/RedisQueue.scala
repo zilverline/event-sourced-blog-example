@@ -1,25 +1,24 @@
 package messaging
 
-import _root_.redis.clients.jedis._
-import org.apache.commons.pool.impl.GenericObjectPool.Config
-import scala.concurrent._
-import scala.concurrent.duration._
-import scala.collection.JavaConverters._
-import akka.actor.ActorSystem
-import play.api.Logger
-import org.joda.time.DateTimeUtils
-import org.joda.time.Instant
+import akka.actor._
 import akka.event.ActorEventBus
 import akka.event.LookupClassification
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import org.apache.commons.pool.impl.GenericObjectPool.Config
+import org.joda.time.DateTimeUtils
+import org.joda.time.Instant
+import play.api.Logger
+import _root_.redis.clients.jedis._
+import scala.collection.JavaConverters._
+import scala.concurrent._
+import scala.concurrent.duration._
 import scala.util.Try
 
 sealed trait Protocol
 case class Process(messageId: String, timesOutAt: Instant) extends Protocol
-//case class TimedOut(messageId: String, timedOutAt: Long) extends Protocol
 
 sealed trait MonitoringProtocol
+case object MonitoringStarted extends MonitoringProtocol
 case class ProcessingStarted(messageId: String, timesOutAt: Instant) extends MonitoringProtocol
 case class ProcessingTimedOut(messageId: String, timedOutAt: Instant) extends MonitoringProtocol
 case class ProcessingCompleted(messageId: String, completedAt: Instant) extends MonitoringProtocol
@@ -27,11 +26,8 @@ case class ProcessingCompleted(messageId: String, completedAt: Instant) extends 
 object RedisQueue {
   val NamePattern = "[A-Za-z0-9_-]+"
 }
-class RedisQueue(
-  val name: String,
-  val initialTimeout: FiniteDuration = 30.seconds)(
-    process: String => Future[Unit])(implicit actorSystem: ActorSystem, val jedisPool: JedisPool)
-    extends redis.RedisSupport {
+class RedisQueue(val name: String, val initialTimeout: FiniteDuration = 30.seconds)(process: String => Future[Unit])(implicit actorSystem: ActorSystem, val jedisPool: JedisPool)
+  extends redis.RedisSupport {
 
   require(name matches RedisQueue.NamePattern, s"queue name incorrect: $name")
 
@@ -39,19 +35,22 @@ class RedisQueue(
 
   private implicit val dispatcher = actorSystem.dispatcher
 
+  private val queueActor = actorSystem.actorOf(Props(new QueueActor), s"queue:$name")
+
   val ControlChannel = s"$name:control"
   val IncomingQueueKey = s"$name:incoming"
   val PendingQueueKey = s"$name:pending"
   val ProcessingSortedSetKey = s"$name:processing"
 
-  @volatile private var closed = false
-  private val shutdownLatch = new CountDownLatch(2)
-  private val ShutdownToken = "SHUTDOWN " + java.util.UUID.randomUUID
-
   def enqueue(messageId: String) {
     withJedis { _.lpush(IncomingQueueKey, messageId) }
     ()
   }
+
+  def startProcessing(): Unit = queueActor ! 'startProcessing
+  def stopProcessing(): Unit = queueActor ! 'stopProcessing
+
+  def close(): Unit = actorSystem.stop(queueActor)
 
   object monitoring extends ActorEventBus with LookupClassification {
     type Classifier = Unit
@@ -112,60 +111,89 @@ class RedisQueue(
     }
   }
 
-  future {
-    logger.info(s"Listening to $IncomingQueueKey")
-    @annotation.tailrec def run {
-      val messageId = Option(withJedis { _.brpoplpush(IncomingQueueKey, PendingQueueKey, 1) })
+  private class ProcessingActor extends Actor {
+    var processing = false
 
-      val timesOutAt = new Instant() plus initialTimeout.toMillis
-      ProcessPendingScript(timesOutAt)
+    override def receive = {
+      case 'startProcessing =>
+        processing = true
+        self ! 'listen
+      case 'stopProcessing =>
+        processing = false
+      case 'listen =>
+        if (processing) {
+          val messageId = Option(withJedis { _.brpoplpush(IncomingQueueKey, PendingQueueKey, 1) })
 
-      messageId foreach { messageId =>
-        logger.trace(s"Processing $messageId from $IncomingQueueKey")
-        process(messageId).onComplete { result =>
-          CompletedScript(new Instant(), messageId)
-          logger.trace(s"Completed $messageId with $result")
+          val timesOutAt = new Instant() plus initialTimeout.toMillis
+          ProcessPendingScript(timesOutAt)
+
+          messageId.foreach { messageId =>
+            logger.debug(s"Processing $messageId from $IncomingQueueKey")
+            process(messageId).onComplete { result =>
+              CompletedScript(new Instant(), messageId)
+              logger.debug(s"Completed $messageId with $result")
+            }
+          }
+          self ! 'listen
         }
+    }
+  }
+
+  private class MonitoringActor extends Actor {
+    val subscription = future[Unit] {
+      subscribeToChannels(ControlChannel)(ControlChannelSubscriber)
+    }
+    subscription.onFailure {
+      case throwable => self ! throwable
+    }
+
+    override def receive = {
+      case throwable: Throwable => throw throwable
+    }
+
+    override def postStop {
+      ControlChannelSubscriber.unsubscribe(ControlChannel)
+      Await.ready(subscription, 5.seconds)
+      ()
+    }
+
+    object ControlChannelSubscriber extends JedisPubSub with RedisPubSubNoOps {
+      private val Started = s"STARTED (${RedisQueue.NamePattern}) ([0-9]+)".r
+      private val Completed = s"COMPLETED (${RedisQueue.NamePattern}) ([0-9]+)".r
+      private val TimedOut = s"TIMEDOUT (${RedisQueue.NamePattern}) ([0-9]+)".r
+
+      override def onSubscribe(channel: String, subscribedChannels: Int) {
+        monitoring publish MonitoringStarted
       }
-      if (!closed) run
-    }
-    run
-  } onComplete { result =>
-    shutdownLatch.countDown()
-    logger.info(s"Stopped listening to $IncomingQueueKey: $result")
-  }
-
-  private val timeoutChecker = actorSystem.scheduler.schedule(initialDelay = 1.seconds, interval = 10.seconds min initialTimeout) {
-    TimedOutScript(new Instant())
-  }
-
-  object ControlChannelSubscriber extends JedisPubSub with RedisPubSubNoOps {
-    private val Started = s"STARTED (${RedisQueue.NamePattern}) ([0-9]+)".r
-    private val Completed = s"COMPLETED (${RedisQueue.NamePattern}) ([0-9]+)".r
-    private val TimedOut = s"TIMEDOUT (${RedisQueue.NamePattern}) ([0-9]+)".r
-    override def onMessage(channel: String, message: String) = message match {
-      case Started(messageId, timesOutAt) =>
-        monitoring publish ProcessingStarted(messageId, new Instant(timesOutAt.toLong))
-      case Completed(messageId, completedAt) =>
-        monitoring publish ProcessingCompleted(messageId, new Instant(completedAt.toLong))
-      case TimedOut(messageId, timedOutAt) =>
-        monitoring publish ProcessingTimedOut(messageId, new Instant(timedOutAt.toLong))
-      case ShutdownToken =>
-        unsubscribe
-      case message =>
-        logger.warn(s"$name: bad control message: $message")
+      override def onMessage(channel: String, message: String) = monitoring publish (message match {
+        case Started(messageId, timesOutAt) =>
+          ProcessingStarted(messageId, new Instant(timesOutAt.toLong))
+        case Completed(messageId, completedAt) =>
+          ProcessingCompleted(messageId, new Instant(completedAt.toLong))
+        case TimedOut(messageId, timedOutAt) =>
+          ProcessingTimedOut(messageId, new Instant(timedOutAt.toLong))
+      })
     }
   }
-  future[Unit] {
-    subscribeToChannels(ControlChannelSubscriber)(ControlChannel)
-    shutdownLatch.countDown()
+
+  private class TimeoutActor extends Actor {
+    val timeoutChecker = context.system.scheduler.schedule(
+      initialDelay = 1.seconds, interval = 10.seconds min initialTimeout,
+      receiver = self, message = 'checkTimeout)
+    override def receive = {
+      case 'checkTimeout => TimedOutScript(new Instant())
+    }
+    override def postStop = timeoutChecker.cancel()
   }
 
-  def close() {
-    closed = true
-    timeoutChecker.cancel()
-    withJedis { _.publish(ControlChannel, ShutdownToken) }
-    shutdownLatch.await(5, TimeUnit.SECONDS)
-    ()
+  private class QueueActor extends Actor {
+    val processingActor = context.actorOf(Props(new ProcessingActor), "processing")
+    val subscriptionActor = context.actorOf(Props(new MonitoringActor), "monitoring")
+    val timeoutActor = context.actorOf(Props(new TimeoutActor), "timeout")
+
+    override def receive = {
+      case message @ ('startProcessing | 'stopProcessing) =>
+        processingActor ! message
+    }
   }
 }

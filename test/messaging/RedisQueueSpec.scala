@@ -77,17 +77,21 @@ class RedisQueueSpec extends org.specs2.mutable.Specification with org.specs2.Sc
     def onCompleted: String => Unit = _ => ()
     def onTimedOut: String => Unit = _ => ()
 
-    val subject: RedisQueue = new RedisQueue(prefix, Duration(2, TimeUnit.SECONDS))(listener)
+    val subject: RedisQueue = new RedisQueue(prefix, Duration(1, TimeUnit.SECONDS))(listener)
     subject.monitoring.subscribe(actorSystem.actorOf(Props(new Actor {
       def receive = {
+        case MonitoringStarted                 =>
         case ProcessingStarted(messageId, _)   => onProcessingStarted(messageId)
         case ProcessingCompleted(messageId, _) => onCompleted(messageId)
         case ProcessingTimedOut(messageId, _)  => onTimedOut(messageId)
       }
     })))
+    subject.startProcessing()
     override def after = {
       subject.close()
       actorSystem.shutdown
+      actorSystem.awaitTermination(Duration(2, TimeUnit.SECONDS))
+      actorSystem.isTerminated aka "actor system terminated" must beTrue
       super.after
     }
   }
