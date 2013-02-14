@@ -5,7 +5,7 @@ import java.util.UUID
 import redis.clients.jedis.Jedis
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class RedisEmailRegistrySpec extends org.specs2.mutable.Specification with RequiresRedis {
+class RedisEmailRegistrySpec extends Spec with RequiresRedis {
 
   "Redis email registry" should {
     "map new email address to requested user id" in new fixture {

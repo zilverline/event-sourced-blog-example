@@ -9,7 +9,7 @@ import akka.actor.Props
 import akka.actor.Actor
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class RedisQueueSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck with support.RequiresRedis {
+class RedisQueueSpec extends support.Spec with support.RequiresRedis {
 
   import ExecutionContext.Implicits.global
   implicit val jedisPool = newJedisPool

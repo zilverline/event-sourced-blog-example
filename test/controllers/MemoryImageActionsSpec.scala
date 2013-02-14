@@ -6,7 +6,7 @@ import play.api.mvc.Results._
 import play.api.test.Helpers._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class MemoryImageActionsSpec extends org.specs2.mutable.Specification {
+class MemoryImageActionsSpec extends support.Spec {
   "Memory image actions" should {
     "commit changes to event store" in new fixture {
       val response = testCommandAction.apply(authenticatedRequest)

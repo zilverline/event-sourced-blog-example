@@ -6,7 +6,7 @@ import org.junit.runner.RunWith
 import org.specs2.runner.JUnitRunner
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class JsonMappingSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
+class JsonMappingSpec extends support.Spec {
   class Parent
   case class Child() extends Parent
   case class Sibling() extends Parent

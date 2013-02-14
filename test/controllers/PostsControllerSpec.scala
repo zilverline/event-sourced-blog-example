@@ -6,7 +6,7 @@ import events._
 import eventstore._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class PostsControllerSpec extends org.specs2.mutable.Specification {
+class PostsControllerSpec extends support.Spec {
   val postId = PostId.generate()
   val postContent = PostContent(title = "title", body = "body")
 

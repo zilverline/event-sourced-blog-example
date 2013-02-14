@@ -5,7 +5,7 @@ import eventstore._
 import scala.collection.immutable.SortedMap
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class PostsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
+class PostsSpec extends support.Spec {
   "posts" should {
     val A = PostId.generate()
     val B = PostId.generate()

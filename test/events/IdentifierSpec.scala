@@ -5,7 +5,7 @@ import org.scalacheck._, Arbitrary.arbitrary
 import play.api.libs.json._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class IdentifierSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
+class IdentifierSpec extends support.Spec {
   import IdentifierSpec._
 
   case class Id(uuid: UUID) extends Identifier

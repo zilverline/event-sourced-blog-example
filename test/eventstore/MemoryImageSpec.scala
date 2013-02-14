@@ -8,7 +8,7 @@ import scala.concurrent.duration._
 import Transaction._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class MemoryImageSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
+class MemoryImageSpec extends support.Spec {
   implicit val StringEventStreamType = EventStreamType[String, String](identity, identity)
   implicit val StringConflictsWith = ConflictsWith[String](_ != _)
   type State = Seq[String]

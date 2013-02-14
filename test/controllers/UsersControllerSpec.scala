@@ -5,7 +5,7 @@ import play.api.test.Helpers._
 import events._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class UsersControllerSpec extends org.specs2.mutable.Specification {
+class UsersControllerSpec extends support.Spec {
   val userId = UserId.generate()
   val email = EmailAddress("john@example.com")
   val displayName = "John Doe"

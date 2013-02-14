@@ -9,7 +9,7 @@ import IdentifierSpec._
 import Generators._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class PostEventsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
+class PostEventsSpec extends support.Spec {
   import PostEventsSpec._
 
   "Post events" should {

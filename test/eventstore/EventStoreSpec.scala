@@ -138,7 +138,7 @@ class CommitSpec extends org.specs2.mutable.Specification with org.specs2.ScalaC
   }
 }
 
-trait EventStoreSpec[ES[Event] <: EventStore[Event]] extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
+abstract class EventStoreSpec[ES[Event] <: EventStore[Event]] extends support.Spec {
   val streamIdGenerator = Gen.wrap(UUID.randomUUID.toString)
   implicit val StringEventStreamType: EventStreamType[String, String] = EventStreamType(identity, identity)
 

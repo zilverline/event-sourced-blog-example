@@ -5,7 +5,7 @@ import eventstore._
 import eventstore.fake.FakeEventStore
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class UsersSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
+class UsersSpec extends support.Spec {
   "Users" should {
     val A = UserId.generate()
     val B = UserId.generate()

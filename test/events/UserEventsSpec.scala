@@ -7,7 +7,7 @@ import IdentifierSpec._
 import Generators._
 
 @org.junit.runner.RunWith(classOf[org.specs2.runner.JUnitRunner])
-class UserEventsSpec extends org.specs2.mutable.Specification with org.specs2.ScalaCheck {
+class UserEventsSpec extends support.Spec {
   import UserEventsSpec._
   import UserEvent._
 
